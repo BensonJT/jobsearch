@@ -1,7 +1,8 @@
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.models import JobListing, SearchConfig
 from backend.adapters.base import BaseAdapter
+
 
 class ArbeitnowAdapter(BaseAdapter):
     def __init__(self):
@@ -12,36 +13,44 @@ class ArbeitnowAdapter(BaseAdapter):
         try:
             data = await self._get(self.url)
             jobs = data.get("data", [])
-            
+
+            # Split comma-separated keyword phrases for OR matching
+            keyword_phrases = [kw.strip().lower() for kw in config.keywords.split(",") if kw.strip()]
+
             listings = []
             for item in jobs:
-                # Check keyword match in title
-                if config.keywords.lower() not in item.get("title", "").lower():
-                    continue
-                
-                # Check location if specified
-                if config.location and config.location.lower() != "remote":
-                    if config.location.lower() not in item.get("location", "").lower():
-                        continue
-                elif config.location and config.location.lower() == "remote":
-                     if "remote" not in item.get("location", "").lower() and "anywhere" not in item.get("location", "").lower():
-                        continue
+                title = item.get("title", "")
+                description = item.get("description", "")
+                text_to_scan = (title + " " + description).lower()
 
-                # Parse date - assuming it's a timestamp or ISO string
-                # SCRIPT_REQUIREMENTS doesn't specify Arbeitnow's date format precisely
-                # Let's check common API behavior or use current time as fallback for now
-                # In a real scenario, we'd parse the specific field.
-                posted_at = datetime.now() # Fallback
-                
+                # OR match: any keyword phrase found in title or description
+                if not any(phrase in text_to_scan for phrase in keyword_phrases):
+                    continue
+
+                # Location filter
+                item_location = item.get("location", "").lower()
+                if config.location and config.location.lower() == "remote":
+                    if "remote" not in item_location and "anywhere" not in item_location:
+                        continue
+                elif config.location and config.location.lower() not in item_location:
+                    continue
+
+                # Parse created_at as Unix timestamp (Arbeitnow API standard)
+                raw_ts = item.get("created_at", 0)
+                try:
+                    posted_at = datetime.fromtimestamp(int(raw_ts), tz=timezone.utc)
+                except (ValueError, TypeError, OSError):
+                    posted_at = datetime.now(timezone.utc)
+
                 listing = JobListing(
-                    title=item.get("title"),
-                    company=item.get("company_name"),
-                    location=item.get("location"),
-                    url=item.get("url"),
+                    title=title,
+                    company=item.get("company_name", "Unknown"),
+                    location=item.get("location", "Remote"),
+                    url=item.get("url", ""),
                     source=self.name,
                     posted_at=posted_at,
-                    description=item.get("description"),
-                    is_remote="remote" in item.get("location", "").lower()
+                    description=description,
+                    is_remote="remote" in item_location or "anywhere" in item_location,
                 )
                 listings.append(listing)
             return listings
