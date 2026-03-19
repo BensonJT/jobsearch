@@ -61,24 +61,26 @@ This information is exactly what the Google CLI (or any LLM-based code generator
 Here are the specific endpoints and credential requirements for your primary sources as of early 2026.
 
 | Provider          | Base URL / Endpoint                                                  | Auth Method          | Notes                                     |
-| :---------------- | :------------------------------------------------------------------- | :------------------- | :---------------------------------------- |
+| :---------------- | :----------------------------------- | :------------------- | :---------------- |
 | **Arbeitnow**     | `https://www.arbeitnow.com/api/job-board-api`                        | **None**             | No key needed. Great for testing.         |
 | **Adzuna**        | `https://api.adzuna.com/v1/api/jobs/{country}/search/{page}`         | `app_id` & `app_key` | Replace `{country}` with `us`, `gb`, etc. |
 | **Jooble**        | `https://jooble.org/api/combined/{API_KEY}`                          | API Key in URL       | Requires a POST request with JSON body.   |
+| **USAJobs**       | `https://data.usajobs.gov/api/search`                                | API Key (Header)     | US Government/Federal jobs.               |
 | **CareerOneStop** | `https://api.careeronestop.org/v1/jobsearch/{userId}/{kw}/{loc}/...` | API Key (Header)     | US Department of Labor data.              |
+
 
 ---
 
 ### Phase 2: Data Mapping Logic
 To make your Python script "Universal," the Google CLI needs to map these varied JSON responses into a single standard format. 
 
-| Standard Field | Adzuna Mapping                       | Arbeitnow Mapping      | Jooble Mapping    |
-| :------------- | :----------------------------------- | :--------------------- | :---------------- |
-| **Title**      | `result['title']`                    | `item['title']`        | `job['title']`    |
-| **Company**    | `result['company']['display_name']`  | `item['company_name']` | `job['company']`  |
-| **Location**   | `result['location']['display_name']` | `item['location']`     | `job['location']` |
-| **Link**       | `result['redirect_url']`             | `item['url']`          | `job['link']`     |
-| **Salary**     | `result.get('salary_min')`           | N/A (usually in desc)  | `job['salary']`   |
+| Standard Field | Adzuna Mapping                       | Arbeitnow Mapping      | Jooble Mapping    | USAJobs Mapping             |
+| :------------- | :----------------------------------- | :--------------------- | :---------------- | :-------------------------- |
+| **Title**      | `result['title']`                    | `item['title']`        | `job['title']`    | `item['MatchedObjectDescriptor']['PositionTitle']` |
+| **Company**    | `result['company']['display_name']`  | `item['company_name']` | `job['company']`  | `item['MatchedObjectDescriptor']['OrganizationName']` |
+| **Location**   | `result['location']['display_name']` | `item['location']`     | `job['location']` | `item['MatchedObjectDescriptor']['PositionLocation'][0]['LocationName']` |
+| **Link**       | `result['redirect_url']`             | `item['url']`          | `job['link']`     | `item['MatchedObjectDescriptor']['PositionURI']` |
+| **Salary**     | `result.get('salary_min')`           | N/A (usually in desc)  | `job['salary']`   | `item['MatchedObjectDescriptor']['PositionRemuneration'][0]['MinimumRange']` |
 
 ---
 
@@ -210,6 +212,8 @@ I've consolidated the environment files we discussed into one place for you to c
 ADZUNA_APP_ID="your_id"
 ADZUNA_APP_KEY="your_key"
 JOOBLE_API_KEY="your_key"
+USAJOBS_API_KEY="your_key"
+USAJOBS_EMAIL="your_email_used_for_registration"
 ```
 
 #### `requirements.txt`
