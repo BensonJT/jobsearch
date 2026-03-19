@@ -6,26 +6,46 @@
   - processor.py: fixed timezone-aware vs naive datetime comparison throughout
   - requirements.txt: removed asyncio (stdlib, not a pip package)
 - Added TheMuseAdapter (no API key required)
+- PostgreSQL Integration Added:
+  - New module `backend/database.py` created for upserting listings.
+  - CLI flags `--db` and `--new-only` implemented in `main.py`.
+  - Database connection details identified from `Environment_Map.md`:
+    - Host: `localhost`, Port: `5432`, User: `postgres`, Password: `PostgreSQL16`
+    - Connection string: `postgresql://postgres:PostgreSQL16@localhost:5432/jobsearch`
+  - Scoring logic updated: Title match (3x), Description match (1x).
 - Confirmed: free/no-auth sources (Arbeitnow, The Muse, RemoteOK) have poor quality for
   executive-level US remote ops/strategy roles
-- Script is functional and ready — blocked on API keys for useful output
+- Script is functional and verified with Adzuna and USAJobs API keys.
 
 ## Project State
 - Foundation: [X]
 - Environment: [X]
 - Harvester Core: [X]
-- TheMuseAdapter: [X] (low yield — retail-heavy without category filtering)
-- ArbeitnowAdapter: [X] (European only — near-zero value for US search)
-- AdzunaAdapter: [X] (Awaiting Keys — HIGHEST PRIORITY)
-- USAJobsAdapter: [X] (Awaiting Keys — second priority, good for federal roles)
+- TheMuseAdapter: [X]
+- ArbeitnowAdapter: [X]
+- AdzunaAdapter: [X] (Verified Live)
+- USAJobsAdapter: [X] (Verified Live)
 - JoobleAdapter: [X] (Awaiting Keys)
 - Frontend: [ ]
-- Database: [ ]
+- Database: [X] (PostgreSQL integration complete)
+
+## Completed Tasks (2026-03-19)
+- [X] PostgreSQL Database Integration:
+  - Schema created (`job_listings` table).
+  - Upsert logic implemented to preserve `status`.
+  - CLI flags `--db` and `--new-only` added.
+- [X] Enhanced Scoring Logic:
+  - Title matches weighted 3x.
+  - Description matches weighted 1x.
+- [X] First Live Harvest Run:
+  - Confirmed Adzuna and USAJobs keys work.
+  - Populated `job_listings` with 300+ executive-level leads.
+- [X] Description Truncation Removed.
+- [X] Environment Mapping:
+  - Identified primary PostgreSQL role (`postgres`) and credentials from Keystone.
 
 ## Pending Tasks
-- [ ] GET ADZUNA KEY: developer.adzuna.com — free, 5 min, no credit card
-- [ ] GET USAJOBS KEY: developer.usajobs.gov/APIRequest/Index — free, 10 min government form
-- [ ] Add keys to .env and run first live harvest
+- [ ] GET JOOBLE KEY (if still needed)
 - [ ] Evaluate output quality; refine keyword list and scoring weights
 - [ ] Consider adding more sources once baseline is working
 

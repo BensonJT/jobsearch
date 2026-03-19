@@ -20,12 +20,19 @@ class SearchConfig(BaseModel):
     location: Optional[str] = "Remote"
     days_limit: int = 7
     min_salary: Optional[int] = None
+    # High-match keywords add +3 bonus on top of standard keyword scoring.
+    # Keep these specific to Jeff's differentiators — avoid generic terms like
+    # "Python" which match developer jobs unrelated to his target roles.
     high_match_keywords: list[str] = [
-        "LSSBB", "Python", "Workforce Planning", "Chief of Staff", 
-        "GenAI", "Business Transformation", "Capacity Management"
+        "LSSBB", "Lean Six Sigma", "Workforce Planning", "Chief of Staff",
+        "GenAI", "Business Transformation", "Capacity Management",
+        "Organizational Effectiveness", "Change Management", "PMO",
+        "Scrum Master", "Operational Excellence"
     ]
     target_companies: list[str] = [
-        "NVIDIA", "OpenAI", "Anthropic", "ServiceNow", "Microsoft",
-        "Mastercard", "Capital One", "JPMorgan Chase",
-        "Booz Allen Hamilton", "Leidos", "Lockheed Martin"
+        "RTX", "Raytheon", "Pratt & Whitney", "Collins Aerospace",
+        "Microsoft", "Mastercard", "Capital One", "JPMorgan Chase",
+        "Booz Allen Hamilton", "Leidos", "Lockheed Martin", "L3Harris",
+        "Humana", "Novartis", "General Motors", "ServiceNow",
+        "NVIDIA", "OpenAI", "Anthropic", "Google", "DeepMind"
     ]

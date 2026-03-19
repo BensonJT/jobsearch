@@ -19,9 +19,40 @@ Architecture decisions that MUST be preserved:
 - JobProcessor is stateless (all static methods) — keep it that way
 - CSV export via pandas in main.py
 
-## Known Issues for Gemini to Fix (see CLAUDE.md for details)
-Priority order:
-1. Arbeitnow date parsing (hardcoded datetime.now() — fix to parse actual created_at Unix timestamp)
-2. Arbeitnow keyword matching (exact substring only — broaden to OR-split-keyword search + description scan)
-3. Timezone-aware vs naive datetime comparison in processor.py (use datetime.now(timezone.utc) consistently)
-4. Remove asyncio from requirements.txt (it is stdlib, not a pip package)
+## Project Status & Improvements (March 19, 2026)
+
+### Fixed Known Issues
+1. **Arbeitnow date parsing:** Fixed to parse Unix timestamp from `created_at`.
+2. **Arbeitnow keyword matching:** Broadened to OR-split-keyword search in both title and description.
+3. **Timezone consistency:** Standardized on `datetime.now(timezone.utc)` for all comparisons.
+4. **Dependencies:** Removed `asyncio` from `requirements.txt`.
+
+### New Capabilities
+- **PostgreSQL Integration:** Persistent storage for job listings with "upsert" logic to prevent duplicates.
+- **Improved Scoring:** Jobs are now scored with title matches weighted 3x more than description matches.
+- **Persistence of Status:** The `status` field in the database (e.g., `new`, `reviewed`, `applied`, `pass`) is preserved across harvest runs.
+- **CLI Flags:**
+    - `--db`: Enables writing results to the PostgreSQL database.
+    - `--new-only`: Filters the export to only include listings with `status='new'` in the database.
+
+### Database Schema & Connection Details
+**Connection String:** `postgresql://postgres:PostgreSQL16@localhost:5432/jobsearch`
+
+```sql
+CREATE TABLE job_listings (
+    id SERIAL PRIMARY KEY,
+    url TEXT UNIQUE NOT NULL,
+    title TEXT,
+    company TEXT,
+    location TEXT,
+    is_remote BOOLEAN,
+    posted_at TIMESTAMPTZ,
+    description TEXT,
+    salary TEXT,
+    source TEXT,
+    match_score INTEGER,
+    search_keywords TEXT,
+    harvested_at TIMESTAMPTZ DEFAULT NOW(),
+    status TEXT DEFAULT 'new'
+);
+```

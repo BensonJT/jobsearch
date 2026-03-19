@@ -6,7 +6,8 @@ from backend.adapters.base import BaseAdapter
 
 # Fetch unfiltered pages — The Muse category names are inconsistent.
 # Apply keyword matching client-side for reliability.
-PAGES_TO_FETCH = 10  # 20 results/page = up to 200 candidates before keyword filter
+# Remote filter is advisory only — Muse location names are unreliable.
+PAGES_TO_FETCH = 15  # 20 results/page = up to 300 candidates before keyword filter
 
 
 class TheMuseAdapter(BaseAdapter):
@@ -46,8 +47,8 @@ class TheMuseAdapter(BaseAdapter):
                     for loc in raw_locations
                 )
 
-                if config.location and config.location.lower() == "remote" and not is_remote:
-                    continue
+                # Don't hard-filter by remote — Muse location tags are unreliable.
+                # The processor's match scoring and is_remote flag handles this downstream.
 
                 try:
                     posted_at = datetime.fromisoformat(
@@ -64,7 +65,7 @@ class TheMuseAdapter(BaseAdapter):
                     url=url,
                     source=self.name,
                     posted_at=posted_at,
-                    description=description[:500],
+                    description=description,
                     is_remote=is_remote,
                 ))
 

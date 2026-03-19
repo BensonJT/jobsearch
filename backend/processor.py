@@ -36,8 +36,12 @@ class JobProcessor:
                     job.is_remote = True
 
         # 4. Match scoring
+        keyword_phrases = [kw.strip().lower() for kw in config.keywords.split(",") if kw.strip()]
+        
         for job in filtered_listings:
             score = 0
+            title_lower = job.title.lower() if job.title else ""
+            desc_lower = job.description.lower() if job.description else ""
             posted = job.posted_at
             if posted.tzinfo is None:
                 posted = posted.replace(tzinfo=timezone.utc)
@@ -52,12 +56,25 @@ class JobProcessor:
                 score += 5
                 job.tags.append("Target Company")
 
-            # High-match keywords: +3 per keyword found in title or description
-            text_to_scan = (job.title + " " + (job.description or "")).lower()
+            # Keyword match scoring: Title (3x) vs Description (1x)
+            for phrase in keyword_phrases:
+                if phrase in title_lower:
+                    score += 3
+                    if phrase not in job.tags:
+                        job.tags.append(phrase)
+                elif phrase in desc_lower:
+                    score += 1
+                    if phrase not in job.tags:
+                        job.tags.append(phrase)
+
+            # High-match keywords bonus: +3 (if found in title or description)
+            # Keeping this as a separate bonus category from SearchConfig
+            text_to_scan = (title_lower + " " + desc_lower)
             for kw in config.high_match_keywords:
                 if kw.lower() in text_to_scan:
                     score += 3
-                    job.tags.append(kw)
+                    if kw not in job.tags:
+                        job.tags.append(kw)
 
             # Remote bonus: +2
             if job.is_remote:
