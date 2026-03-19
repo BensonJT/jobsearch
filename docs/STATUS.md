@@ -1,33 +1,38 @@
 # Session Status — Jobsearch
 
-## Current Session (2026-03-18)
-- Initialized git repository.
-- Created project foundation: `.gitignore`, `CLAUDE.md`, `GEMINI.md`, `README.md`, `requirements.txt`.
-- Set up initial documentation structure in `docs/STATUS.md`.
-- Created conda environment `jobsearch` (Python 3.12).
-- Installed dependencies from `requirements.txt`.
-- Designed and implemented the Modular Job Harvester architecture:
-    - `backend/models.py`: Pydantic models for job listings and search config.
-    - `backend/adapters/`: Source-specific adapters (Arbeitnow, Adzuna, Jooble, USAJobs).
-    - `backend/processor.py`: Deduplication, filtering, and scoring logic.
-    - `backend/harvester.py`: Asynchronous orchestration of job fetches.
-    - `main.py`: CLI entry point for executing harvests.
-- Verified functionality with a dry run using the public Arbeitnow API.
+## Current Session (2026-03-19)
+- Bug fixes applied to initial Gemini codebase (Claude Code review):
+  - arbeitnow.py: fixed date parsing (Unix timestamp) and keyword matching (OR-phrase, title+description)
+  - processor.py: fixed timezone-aware vs naive datetime comparison throughout
+  - requirements.txt: removed asyncio (stdlib, not a pip package)
+- Added TheMuseAdapter (no API key required)
+- Confirmed: free/no-auth sources (Arbeitnow, The Muse, RemoteOK) have poor quality for
+  executive-level US remote ops/strategy roles
+- Script is functional and ready — blocked on API keys for useful output
 
 ## Project State
 - Foundation: [X]
 - Environment: [X]
 - Harvester Core: [X]
-- Adzuna Adapter: [X] (Awaiting Keys)
-- Jooble Adapter: [X] (Awaiting Keys)
-- USAJobs Adapter: [X] (Awaiting Keys)
-- Arbeitnow Adapter: [X] (Functional)
-- Backend: [X]
+- TheMuseAdapter: [X] (low yield — retail-heavy without category filtering)
+- ArbeitnowAdapter: [X] (European only — near-zero value for US search)
+- AdzunaAdapter: [X] (Awaiting Keys — HIGHEST PRIORITY)
+- USAJobsAdapter: [X] (Awaiting Keys — second priority, good for federal roles)
+- JoobleAdapter: [X] (Awaiting Keys)
 - Frontend: [ ]
 - Database: [ ]
 
 ## Pending Tasks
-- [ ] Obtain and configure API keys in `.env`.
-- [ ] Refine date parsing for specific APIs once keys are available.
-- [ ] Add more sources (e.g., The Muse, CareerOneStop).
-- [ ] Implement a simple frontend/dashboard for viewing leads (optional).
+- [ ] GET ADZUNA KEY: developer.adzuna.com — free, 5 min, no credit card
+- [ ] GET USAJOBS KEY: developer.usajobs.gov/APIRequest/Index — free, 10 min government form
+- [ ] Add keys to .env and run first live harvest
+- [ ] Evaluate output quality; refine keyword list and scoring weights
+- [ ] Consider adding more sources once baseline is working
+
+## Known Good Run Command
+source ~/miniconda3/etc/profile.d/conda.sh
+conda run -n jobsearch python main.py \
+  --keywords "Chief of Staff, Director Operations, Operational Excellence, Business Transformation, Workforce Planning, Data Scientist, Six Sigma" \
+  --location "Remote" \
+  --days 14 \
+  --output output/job_leads_$(date +%Y%m%d).csv
