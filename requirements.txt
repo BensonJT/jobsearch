@@ -1,0 +1,21 @@
+# Core Dependencies
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+sqlalchemy
+alembic
+psycopg2-binary
+
+# Utilities
+python-dotenv
+requests
+httpx
+beautifulsoup4
+pandas
+openpyxl
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
