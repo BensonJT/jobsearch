@@ -1,9 +1,11 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 13:05 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-15 13:35 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
 
 ## Active Sprint
 @/docs/SPRINT_PLAN.md — **Phase 1 built and committed locally (not pushed). Next: Fable audits Phase 1 against §11, then Phase 2 (labels + TF-IDF/LR).** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` and gitignored `backend/profile_local.py`.
+
+**Phase 2 does not need to wait for the live DB.** Labels come from the vault; training reads `vw_label_set` and writes `label_docs` / `models`. Use the scratch copy **`db/finder_scratch.duckdb`** (on E:, gitignored; copied from the live DB at 12:30, 77,777 active / 69,618 JDs, already carries Phase 1 screens under an older rules version, so `finder.py screen` re-screens it). Installing scikit-learn etc. into `.venv` is safe while the backfill runs (that process has its imports loaded; the queued Amentum ingest runs `--no-screen`). Validate the model on the live DB once it is free. Keep large scratch files off C: (`/tmp` is on the C:-backed WSL disk).
 
 ## ⚠️ Running right now (check first)
 
@@ -34,11 +36,12 @@ Check: `grep '^===' output/backfill_20260915_day.log; tail -3 output/amentum_ing
 7. **Tier 3 + assessment gate** is made meaningful with `CODING_TEST_TERMS` (HackerRank, Codility, coding assessment, take-home…) → reason on tier 3 only (memory: data lane only without a coding-test gate).
 8. **`is_commutable`** is unchanged in code (hybrid flag alone was already not commutable); docstring states it. The `$…K ask` flag in `screen.py` now reads `P.COMP_ASK` instead of a hard-coded figure (output identical).
 9. **Writes** use one JSON string per batch expanded with `json_transform` into a temp table; reads stream from a second cursor. Binding Python lists as DuckDB params cost ~0.8 ms per element (500-row batch: 3.6 s to bind vs 0.01 s to insert/update) — the first full screen was >10 min; now 209 s.
-10. `write_jobs_found` has `table_cap=150`; `report` CLI adds `--block-min-band` and `--since-hours`; `vw_shortlist` joins `SELECT DISTINCT matched_posting_id FROM tracker`.
-11. vault_dir may be the vault root (as `.env` has it) or the Job_Search folder; `tracker_sync.job_search_dir` resolves both. (Note: the old `sweep.py` assumes the Job_Search folder, so its tracker dedup is silently off with the current `.env`.)
+10. **Place matching (13:35, user request):** `screen.place_matches` matches places as whole words per location segment (split on `;` / `|`); an entry `"name, st"` requires that US state in the same segment (uppercase code or full name; "west virginia" is never VA; `d.c.` = DC). `is_commutable` and `corridor_rule` both use it; `profile_local` pins every ambiguous place and leaves only names unique to the area unpinned. On the scratch corpus: 15,362 distinct location strings, old substring matches 339 → 273 now; dropped are Fredericksburg VA, Arlington TX/MA, Leesburg FL, Clarksburg WV, New Brunswick, Frederick CO, Vienna (Austria), Rockville IN, and similar; added are only Washington D.C. forms the old strings missed. Corridor matches outside Maryland: none. RULES_CODE_VERSION 2026-09-15.3.
+11. `write_jobs_found` has `table_cap=150`; `report` CLI adds `--block-min-band` and `--since-hours`; `vw_shortlist` joins `SELECT DISTINCT matched_posting_id FROM tracker`.
+12. vault_dir may be the vault root (as `.env` has it) or the Job_Search folder; `tracker_sync.job_search_dir` resolves both. (Note: the old `sweep.py` assumes the Job_Search folder, so its tracker dedup is silently off with the current `.env`.)
 
 ## §11 acceptance — results (scratch DB, copied 12:30 while the backfill was still writing: 77,777 active, 69,618 with a JD)
-- [x] `pytest -q`: 44 passed.
+- [x] `pytest -q`: 44 passed at the Phase 1 commit; 46 after the place fix.
 - [~] `finder.py screen --full`: **209 s** (< 10 min ✅) on local disk. Verdicts **candidate 73 / review 191 / reject 77,513** — candidate+review is **264, not the low thousands** the spec expected. Only 1,184 active rows have a tier at all (function hit in the title); of those, 764 reasons are "not remote and outside the commute area".
 - [~] `finder.py report`: parses cleanly (no stray headings, blank lines around every `---`, `# Company:` = `**Fit` = blocks). **Default bar gives 0 blocks**: rules-only `rule_score` tops out at 65 by construction (tier1 30 + extra hits 10 + senior 5 + remote 10 + comp 10), so nothing reaches `strong` (70) until Phase 2 adds `fit`. Scores seen: max 55; bands partial 2, weak 74. With `--block-min-band weak`: 15 blocks, 15 summary rows, 200 passed rows.
 - [~] `finder.py sync`: **336 tracker rows, 56 matched (fuzzy), 0 exact** (no Posting ID column yet) — below the spec's >100. Of the 280 unmatched, 151 are employers not in the ATS registry; the other 129 have the employer but a genuinely different req (closest Jaccard ≤ 0.57, e.g. "Program Manager, Operational Excellence" vs "Program Manager"). Threshold left at 0.6 on purpose. Exact matches arrive once the tracker carries Posting IDs (Phase 5).
@@ -52,7 +55,7 @@ Pay figures in comp flags are redacted as `<ask>`/`<top>` here (public repo).
 |---|---|
 | Henry Schein R134977 Sr Mgr AI Transformation & Process Excellence: tier 1, top 20 | ✅ **tier 1, rank 2** of vw_shortlist, score 50, review (flag: `<ask> sits above the <top> top`). |
 | PFG Global Process Owner Director: tier 1 | ⚠️ **Not in the corpus** (PFG is on BrassRing, no adapter). Other GPO titles: QTS "GPO - Capacity Strategy & Planning" tier 1 rank 7 (flag: plant vocabulary "utilities"); QTS "GPO - Capital Delivery" tier 1; Agilent "HR Operations - GPO" tier 1 reject on location. |
-| QIAGEN / Lonza / Kite corridor plant roles: reject | ⚠️ **None of the three employers is in the corpus.** Nearest case: Agilent "Process Engineer - Advanced" (Frederick, **Colorado**) rejects on `different discipline (plant/industrial: manufacturing)` + `corridor manufacturing (required: chemical)` — the corridor rule matched a Colorado Frederick. Rockville Guidehouse/M&T rows are review, not plant. |
+| QIAGEN / Lonza / Kite corridor plant roles: reject | ⚠️ **None of the three employers is in the corpus.** Nearest case: Agilent "Process Engineer - Advanced" (Frederick, **Colorado**) rejects on `different discipline (plant/industrial: manufacturing)` + `corridor manufacturing (required: chemical)` — the corridor rule matched a Colorado Frederick (**fixed 13:35**: places pin their state; the Agilent row still rejects on discipline). Rockville Guidehouse/M&T rows are review, not plant. |
 | Equinix Dir Business Process Excellence: sales-ops reason only if GTM/CRO in Required | ⚠️ **Not in the corpus.** Corpus-wide among tiered rows: 44 `sales/revenue ops scope` reasons, 16 vocabulary flags. |
 | USAA "10+ years banking" row: domain-tenure flag, not reject | ⚠️ **No such JD.** USAA "Bank Business Process Consultant Lead" (San Antonio) is **candidate**, score 40; its only years line is "8 years of experience in business process consultation…", no banking term, so no flag is correct. A second copy of that req rejects on location. 34 domain-tenure flags corpus-wide (never a reason), e.g. Centene "Director, Provider Data Process Owner" `domain-tenure gate (insurance, 7 yrs)`. |
 | Verizon CX Transformation & Change Manager: not comp-rejected | ✅ **Not comp-rejected** (band top above the floor). ⚠️ It **is rejected on location**: Rolling Meadows IL / Temple Terrace FL, workplace_type NULL, so not remote and not commutable — consistent with the 09-14 manual pass on the same row. |
@@ -84,7 +87,7 @@ SELECT match_kind, count(*) FROM tracker GROUP BY 1;
 ## Open questions / decisions for the user or the auditor
 - **No `strong` blocks in Phase 1** (rule-only max 65). Accept until Phase 2 adds fit, or run `report --block-min-band weak` meanwhile? The daily sweep report uses the default bar.
 - **Funnel is narrow** (264 non-reject): the title gate (TITLE_FUNCTION_TERMS) decides tier; 76,593 active rows have no function term in the title. Widening is a profile change, not code.
-- **`frederick` matches Frederick, Colorado** (corridor + commutable). The substring-based `is_commutable` also matches "Fredericksburg". Consider state-qualified places in `profile_local.py`.
+- ~~Frederick, Colorado / Fredericksburg matching~~ — fixed 13:35 (state-pinned places). `vw_dmv_or_remote_active` in `store.py` is still a coarse city regex (unchanged; it is a browsing view, not a rule).
 - **Faith flag text in `screen.py`** still hard-codes a comp range (pre-existing; left alone because `sweep.py` output must not change).
 - **Live DB on the external drive:** the 209 s figure is on local disk. Expect the first `rescreen-all` on E: to be slower (one commit per 500 rows; the UPDATE touches `postings`); the daily path screens only new/changed rows.
 
