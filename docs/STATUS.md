@@ -42,8 +42,33 @@ _Last updated: 2026-09-15 evening (Claude Code / Opus on Vostro; Phase 3a built 
 5. **What does work:** the source-invariance fix (0.14-point paired gap), specificity (boilerplate down to 0.26), the evidence pipeline (matches are dominated by `resume_bullets` and `soar_stories`, the achievement-kind sources, exactly as intended), and the unit cache (warm re-cover 132 s).
 6. **Symptom worth seeing:** ranking survivors by `coverage_required` puts GitLab "Staff Backend Engineer" (77.0), Guidehouse "Data Platform Lead" (73.0) and "Adobe Commerce Sr. Solutions Architect" (63.7) on top — short, terse requirement lists with few units, where noise dominates.
 
+## Option A was prototyped and also fails (2026-09-15, scratch DB, read-only)
+Contrast scoring — score each requirement by how far its best evidence cosine stands above that requirement's own
+baseline against the whole evidence store — was measured on the stored vectors (no re-embedding). Variants: `gap`
+(best − mean), `z` ((best − mean)/std), `top5` (mean of the 5 best − mean), `abs_best` (the current absolute cosine)
+and `gap_kw` (kind weight applied before the max). Over 1,772 postings with ≥ 3 required work units:
+
+| variant | AUC pos vs audit | vs fit_top | vs pseudo | Henry Schein rank | worst misfire rank |
+|---|---|---|---|---|---|
+| gap | 0.47 | 0.50 | 0.62 | — | Centene VP Medicare **40** / 1,772 |
+| top5 | 0.48 | 0.57 | 0.75 | 242 | Novartis AI Foundations **84** |
+| abs_best | **0.73** | 0.50 | 0.75 | 360 | Novartis 725 |
+| gap_kw | 0.48 | 0.65 | 0.63 | 859 | Humana Creative Ops **152** |
+
+No variant puts the bullseye above the misfires consistently, and every variant's top 8 is dominated by engineering
+and consulting roles (GitLab Staff Backend Engineer, Guidehouse Data Platform Lead, Databricks Field Engineering,
+Perficient Adobe Commerce). **Caveat:** only 21 labeled positives have coverage rows on this corpus, so the AUCs are
+noisy; the named-row ranks are the interpretable signal, and they are bad. Conclusion: the ceiling is the sentence
+encoder's discrimination on this text, not the band scheme layered on top of it. Option A is not worth building.
+
+**Analysis caveat for anyone re-running this:** DuckDB's `fetchnumpy()` returns NULL DOUBLEs as `NaN`, not `None`,
+and `requirement_units.spec` is written only for the units that survive the 40-unit cap — so a naive
+`spec is not None` guard silently poisons every JD with more than 40 work units. The first prototype run was invalid
+for that reason (`nan` scores, AUCs of exactly 0.500). Production is unaffected: `score_units` computes specificity
+in memory for all work units before capping.
+
 ## Options for 3b (not built; the user decides with Fable)
-- **A. Contrast instead of absolute bands.** Score each requirement by how far its best evidence cosine sits above that requirement's own baseline (its median or 90th percentile cosine against the whole evidence store), so the constant offset cancels. Cheapest change, keeps everything else.
+- ~~**A. Contrast instead of absolute bands.**~~ **Prototyped 2026-09-15 and rejected** — see the section above.
 - **B. A stronger encoder** (bge-base / bge-large / e5-large) for wider spread, at 3–10× the embedding cost; the unit cache makes a one-off re-embed tolerable but the daily path slows too.
 - **C. Keep bands, fix the inputs:** require a minimum `n_required` (the tech-role artifact above), raise the specificity floor so generic lines cannot carry credit, and hand-set thresholds from the observed distribution rather than letting a flat AUC choose them.
 - **D. Skip to Phase 4 for the top N** (LLM review reads context directly) and keep coverage as a reported figure only.
@@ -64,14 +89,25 @@ _Last updated: 2026-09-15 evening (Claude Code / Opus on Vostro; Phase 3a built 
 
 ## Pending
 - [ ] **Decision: which 3b option (or none).** Phase 4 stays blocked until coverage earns its weight (§16.6).
-- [ ] Confirm the `not_in_record` starter list (Power BI, Tableau, Prosci certification, PMP, CSM) and `light_in_record` (AWS, Azure, GCP) in `evidence.local.toml`.
+- [ ] **Bug: the term tiers are not in the coverage cache key.** `evidence_version` hashes unit ids + model only, so
+      editing `not_in_record` / `light_in_record` leaves existing `coverage` rows untouched and `coverage` reports
+      "0 postings" instead of re-scoring. Fold a hash of both lists into `evidence_version` (re-scores from the unit
+      cache, no re-embedding). Tonight's live run is unaffected: the live DB had no coverage rows.
+- [x] ~~Confirm the `not_in_record` starter list~~ — confirmed by the user 2026-09-15 and applied before the live run:
+      `not_in_record` = Prosci certification / certified, PMP, Azure; `light_in_record` = Power BI, Tableau, Looker,
+      Qlik, ThoughtSpot, Prosci (bare), CSM, AWS, GCP. Resume rule unchanged: never claim Power BI or Tableau.
 - [ ] Run the live DB through `evidence --rebuild` → `coverage` when 3b lands (cold cost ≈ 25 min; the live corpus is slightly larger than the scratch copy).
 - [ ] Push: commits `ebcf40c` and this one are local only; the user pushes.
 - [ ] Carried: SmartRecruiters / Workable JD backfill (5.1 % / 0.8 % coverage); daily schedule; long-tail adapters (iCIMS, Dayforce, Radancy, BrassRing); registry "VERIFY" rows; aggregator keys; cleanup of `db/jobsearch.duckdb.v1-backup-20260915` and the history bundle.
 
 ## Run
 ```bash
-.venv/bin/python sweep_ats.py                                   # sweep + JDs + finder stage (now incl. coverage)
+.venv/bin/python sweep_ats.py                                   # all stages, report written last
+# by hand, same order — never stop before the report:
+.venv/bin/python finder.py labels --report && .venv/bin/python finder.py train --report \
+  && .venv/bin/python finder.py rescreen-all && .venv/bin/python finder.py sync \
+  && .venv/bin/python finder.py evidence --rebuild && .venv/bin/python finder.py coverage \
+  && .venv/bin/python finder.py report
 .venv/bin/python finder.py setup-check                          # personal files, dependencies, manifest, schema
 .venv/bin/python finder.py evidence --check | --rebuild         # evidence manifest -> evidence_units
 .venv/bin/python finder.py coverage [--all] [--limit N]         # requirement coverage for survivors
