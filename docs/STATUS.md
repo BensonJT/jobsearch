@@ -72,11 +72,11 @@ Rebuilt `backend/ats/`:
 - **New platform `eightfold`** in `backend/ats/adapters.py`: identifier_1 = careers host URL, identifier_2 = company domain. Two list flavors exist and the adapter tries both: `apply/v2/jobs` (Liberty Mutual; Microsoft returns 403) then `pcsx/search` (Microsoft, Omnicell). Both page 10 at a time regardless of `num`. The list JD is a truncated preview, so `apply/v2/jobs/<id>` detail always supplies it (works even where the apply/v2 list is refused). Row key is Eightfold's own posting id; the display job id is reused across locations (21 of Microsoft's 2,240).
 - **Page drift:** a single timestamp-ordered pull of Microsoft stored 2,208–2,219 of 2,240 (postings refreshed mid-pull shift the pages). Fix: read in both orders (timestamp, then relevance), union on Eightfold id, and report Truncated (no close pass) if the union is more than 0.5% (min 3) short of the board's count. Microsoft now takes ~200 s per sweep.
 - **Live test on a scratch DB:** Omnicell 78, Liberty Mutual 210, Microsoft 2,237 of 2,237–2,240, no duplicates, 0 errors, 30 JDs fetched cleanly. 5 unit tests added (16 total).
-- **Registry:** Microsoft and Omnicell rows already had the right identifiers. **Liberty Mutual's row still needs fixing** to `https://libertymutual.eightfold.ai` / `libertymutual.com` — the vault CSV was locked by a Windows process (Excel?) when I tried. First full sweep of Microsoft will fetch up to 2,240 JDs (~30 min at ~75/min).
+- **Registry:** Microsoft and Omnicell rows already had the right identifiers. Liberty Mutual's row was fixed to `https://libertymutual.eightfold.ai` / `libertymutual.com`. First full sweep of Microsoft will fetch up to 2,240 JDs (~30 min at ~75/min).
 - **Taleo is not buildable for the registry's employers:** UHG's careersections (10000/10020/10050) all 302 to the Radancy front end at careers.unitedhealthgroup.com (JSON wrapper around rendered HTML, 8.6 MB per page); Centric is Taleo *Business Edition* at `phg.tbe.taleo.net/phg02` (`org=CENTCONS&cws=38`), which serves HTML only. README's unsupported list says so now. A Radancy adapter would cover UHG + L3Harris but means parsing HTML fragments.
 
 ## Pending / next session
-- [ ] **Fix the Liberty Mutual registry row** (see above) once the CSV is closed in Windows.
+- [x] Liberty Mutual registry row fixed 09-15 ~11:30.
 - [ ] **Confirm the backfill chain and Amentum ingest finished**, then run the coverage query above.
 - [ ] **Push local commits** (`git push`; plain push, no force needed now).
 - [ ] **Screen engine:** run `backend/screen.py` rules against `postings` → `screen_verdict` / `screen_score`. Build the SQL views/macros for job scenarios on top.
