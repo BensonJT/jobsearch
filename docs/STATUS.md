@@ -13,7 +13,8 @@ _Last updated: 2026-09-15 18:00 EDT (Claude Code / Opus on Vostro). Overwrite at
 All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,777 active / 69,618 with a JD). It carries `label_docs`, model **`c1f56157feaf`**, and screens under rules **`a844b0d2d80d`** · model **`c1f56157feaf`** (earlier screens under `823be4a70f67` (§13) and `a78e37bd2f70` (§14 before the fixes) remain in `screens` for comparison). scikit-learn 1.9.1 / numpy / scipy / joblib are installed in `.venv`.
 
 ## State of the machine (18:00)
-- **Nothing running.** Workday all-titles backfill `=== DONE` 14:18; Amentum ingest `=== AMENTUM DONE` 15:03 (2,768 postings, 2,763 JDs). The live `db/jobsearch.duckdb` is free.
+- **Nothing running** (checked 18:05). Oracle all-titles, Workday prefiltered and Workday all-titles JD backfills `=== DONE` 14:18; Amentum ingest `=== AMENTUM DONE` 15:03 (2,768 postings, 2,763 JDs). The live `db/jobsearch.duckdb` is free.
+- **Live DB JD coverage: 80,276 active, 78,655 with a JD (98.0%).** Workday 58,616 / 99.3% · Oracle ORC 15,650 / 99.6% · Greenhouse 3,882 / 100% · SmartRecruiters 1,104 / **5.1%** · Lever 506 / 100% · Ashby 393 / 100% · Workable 123 / **0.8%** · BambooHR 2 / 100%. SmartRecruiters and Workable were not in today's backfill (a `--platform smartrecruiters` / `--platform workable` detail pass is the follow-up). 19 runs logged today; last JD fetched 15:02 EDT. `screens` on the live DB: 0.
 - **The live DB has not had a finder run yet.** Every number in this file is from `db/finder_scratch.duckdb` (copied 12:30, before the backfill finished and before Amentum). First live run when wanted: `finder.py labels --report` → `train --report` → `rescreen-all` (~7.5 min local disk; slower on E:) → `sync` → `report`. From then on `sweep_ats.py` runs the finder stage itself.
 
 ## Decision trail — how ranking moved from titles to context (read this first)
