@@ -80,7 +80,11 @@ Rebuilt `backend/ats/`:
 - **Live:** Logos Bible Software 6 live, 6 JDs, pay parsed on two ($125–135K Data Scientist US). Jeff's apply URL carried only the numeric JobId; the GUID came from the Details page's all-jobs link. Registry row updated in the vault (Faithlife LLC is the legal entity). 3 unit tests (19 total).
 - **README** now states the one HTML exception honestly (embedded JSON + one description block).
 
-## NEXT SESSION: design the "job finding" layer (Jeff wants to brainstorm this first)
+## ⭐ ACTIVE SPRINT: build the job-finding layer — `docs/SPRINT_PLAN.md` is the binding contract
+
+Designed and approved 2026-09-15 (Fable session). **Builder: Opus (high/xhigh). Auditor: Fable, against SPRINT_PLAN §11.** Read `docs/SPRINT_PLAN.md` first, then the vault's `Professional/Areas/Job_Search/Tools/Finder_Build_Personal_Appendix.md` for the personal values (never into tracked files). `GEMINI_API_KEY` and `GEMINI_API_MODEL` are already in `.env`. Develop on a scratch DB copy until the backfill below prints `=== DONE`. The brainstorm notes below are superseded by the sprint plan.
+
+## (superseded) NEXT SESSION: design the "job finding" layer
 
 **The question Jeff posed (11:20 EDT):** how do we build filtering that replicates what he asks Cowork / Claude Code to do by hand when scanning the JD corpus? i.e. turn "read these 60,000 descriptions and tell me which ones are me" into something that runs in the pipeline.
 
