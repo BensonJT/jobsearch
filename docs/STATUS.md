@@ -1,85 +1,59 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 14:00 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-15 15:40 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
 
 ## Active Sprint
-@/docs/SPRINT_PLAN.md — **Phase 2 (labels + TF-IDF/LR) built and committed locally (not pushed). Next: Fable audits Phase 2 against §11, then Phase 3 (embeddings).** Phase 1 was committed earlier the same day. Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` and gitignored `backend/profile_local.py`.
+@/docs/SPRINT_PLAN.md — **Phase 2 built, then amended the same afternoon by user decision (§13: labels, source invariance, level, workplace, non-US, rule rescale). Both committed locally, not pushed. Next: Fable audits Phase 2 + §13 against §11, then Phase 3 (embeddings).** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` and gitignored `backend/profile_local.py`.
 
-All Phase 2 numbers below are from the scratch copy **`db/finder_scratch.duckdb`** (E:, gitignored; 77,777 active / ~69.6k with a JD). The live DB was still locked by the backfill at 13:40. It now carries `label_docs`, a trained model `12bd55424307` (`db/models/12bd55424307.joblib`), and screens under rules `f1451d3ad1e9` · model `12bd55424307`.
+All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,777 active / 69,618 with a JD). It carries `label_docs`, model **`c1f56157feaf`**, and screens under rules **`823be4a70f67`** · model **`c1f56157feaf`**. scikit-learn 1.9.1 / numpy / scipy / joblib are installed in `.venv`.
 
 ## ⚠️ Running right now (check first)
-At 13:40 EDT the Workday all-titles JD backfill (`output/run_backfill_day.sh`, stage 3, PID 105892, running 3 h 25 m) was still going, with the Amentum waiter `output/after_backfill_amentum_v2.sh` (`--no-screen`) queued behind `=== DONE`.
+- Workday all-titles backfill: **`=== DONE` 14:18.**
+- Amentum ingest (`output/after_backfill_amentum_v2.sh`, `--no-screen`): **running at 14:30** (400/2,768 JDs, ~10 JDs/min per 100 → roughly an hour). Check: `tail -3 output/amentum_ingest_20260915.log; ps -eo pid,etime,args | grep -E '[a]fter_backfill|[s]weep_ats.py'`.
+- **After it finishes, first live run:** `finder.py labels --report` → `train --report` → `rescreen-all` (7.5 min on local disk with the model; slower on E:) → `sync` → `report` when a file is wanted. A new rules or model version makes every active row due, so the first sweep after a retrain does a full rescreen.
 
-Check: `grep '^===' output/backfill_20260915_day.log; tail -3 output/amentum_ingest_20260915.log; ps -eo pid,etime,args | grep -E '[a]fter_backfill|[s]weep_ats.py'`
+## §13 amendments — what changed (user decisions, 2026-09-15 afternoon)
+- **Negatives rethought.** Nothing in the vault is a negative: pass / not-pursuing folders are near-miss positives (weight 0.5); passed rows and `pass` decisions are context only, never trained. Negatives = 1,500 pseudo-negatives (random JDs with no function term in the title). The low-data fit weight (0.15) no longer triggers: 362 positives / 1,500 pseudo-negatives → fit weight back to 0.35.
+- **Source artifact.** The first model had learned "career-site page = not a fit": top negative terms were page boilerplate and `xa` (7,689 active JDs store line breaks as `&#xa;`). Fixes: HTML-unescape + NFKC; drop lines with ≥ 2 `BOILERPLATE_MARKERS`; strip the employer's name; letters-only tokens; `MODEL_STOP_WORDS` (level words incl. associate, logistics, boilerplate); `max_df` 0.5; URL/req-matched positives trained on the posting's text; other matched positives trained on both copies with `StratifiedGroupKFold`. **Paired held-out gap (same 43 jobs, vault copy vs career-site copy): 0.20 → 0.15** (0.77 vs 0.62). Not closed; remaining negatives are diffuse page words (date, competitive, commitment, diversity, local). Phase 3 embeddings or JD-section extraction are the next lever.
+- **Level.** `required_years` reads every "N years … experience" number; level = the MOST any line asks (≥ 8 senior, 5–7 mid, < 5 junior; > 25 ignored). Junior = reason unless an unambiguous senior title (director, VP, principal, head of, chief) or band top ≥ floor (then flag `few years asked`); mid = flag unless senior title or band top ≥ ask; early-career title (intern, summer associate, entry level, junior) = reason. "Associate" never implies level (screen.py's `below target level` superseded in the finder). The senior rule point comes from this level.
+- **Workplace.** A JD stating in-office days per week / fully on-site sets `workplace_type` when the ATS left it NULL; stated hybrid/onsite is never "remote" (the ≥3-states guess used to override it — State Street's bug).
+- **Outside the US** hard reject (ATS country code, or every location segment names a `NON_US_TERMS` place; one US segment keeps it; bare "Remote" never rejects).
+- **Rule score rescaled** to 0–100 against `rule_max()` = 65.
+- HTML entities are also decoded before the rules run and in the report's JD body.
+- **Tests: 60 passing.**
 
-**After both finish, first live run:** `finder.py labels --report` → `finder.py train --report` → `finder.py rescreen-all` (≈5.5 min with the model on local disk; slower on E:) → `finder.py sync` → `finder.py report` when a file is wanted. From then on `sweep_ats.py` loads the newest model itself. A new model version makes every active row due, so the first sweep after a retrain does a full rescreen.
+## §11 results after §13 (scratch DB)
+- `labels --report`: 410 positives with text (application 297, decision 45, escalated 68) · 1,500 pseudo-negatives · 356 context-only rows · 1,862 training docs after dedupe (+43 career-site copies).
+- `train --report`: **5-fold grouped AUC 0.980** · precision@20 1.000 · positives mean fit **0.79 held-out** / 0.89 in-sample · confusion@0.5 tp 369 / fp 80 / fn 36 / tn 1,420. Held-out by text source: vault 0.82 (n 348) · near-miss folders 0.80 (15) · career-site 0.63 (14) · paired 0.77 vs 0.62 (43). Signal AUCs: rule 0.853 · fit 0.977 · blend 0.608 (rejects score 0).
+- Top positive terms: transformation, strategic, analytics, data, change management, initiatives, operational, governance, improvement, project management, process improvement, lean, business process, sigma, business operations, excellence. Top negative: customer, sales, security, date, software, maintenance, guest, electrical, compliance, equipment, safety.
+- Highest pseudo-negatives (unlabeled that read like fits): GE Vernova Plant Leader .86, Capital One Sr Mgr Data Analyst Risk .85, Amgen S2P SOX & Compliance .85, GE Vernova Compliance Innovation & AI Lead .84, Fannie Mae Sr Dir Modeling & Analytics .82.
+- `rescreen-all`: **452 s**. Verdicts candidate 43 / review 184 / reject 77,550 (was 73 / 193 / 77,511). Bands **strong 11** / partial 42 / weak 68.
+- **Default report bar now reaches strong:** vw_shortlist has 6 strong rows (max final 82). The default-bar `report` on scratch still wrote 0 blocks because all 6 were already in `surfaced` from the earlier test reports (14-day exclusion; they appear in the summary table as `(shown …)`). On the live DB, which has no surfaced rows, they would be blocks.
+- Reason families (active): off-function title 76,593 · not remote/outside commute 63,582 · off-lane title 22,694 · **outside the US 20,429** · **junior level 19,303** · comp 7,472 · **early-career title 5,238**. Tiered flags: clearance 249 · **mid level 205** · local/hybrid 189 · **few years asked 30**. Only 14 tiered rows reject on outside-the-US alone.
+- **Max required years over 69,618 active JDs:** none stated 29,674 · < 5 21,059 · 5–7 9,561 · 8–9 3,988 · 10–14 4,504 · 15–19 738 · 20–25 94. Highest seen: 25 (8 JDs, e.g. TS/SCI system engineer roles), 20 (76), 18 (60).
 
-## Phase 2 — what was built
-- **`backend/finder/labels.py`**: `strip_boilerplate`, `jd_section`, `load_applications` (frontmatter status → label; JD ≥ 800 chars), `load_jobs_found_escalated` (weight 0.7, deduped against applications and across files), `load_jobs_found_passed` (label 0, text from a matched posting), `PostingIndex` / `match_to_postings` (exact URL → employer req_id inside the URL → company keys + `similar_title`), `pseudo_negatives` (deterministic `hash(posting_id || seed)` order, current `screen_row` rejects on off-function / off-lane title), `sync_labels` (rebuilds the four label sources in one transaction), `label_counts`.
-- **`backend/finder/features.py`**: `doc_text` (title twice + boilerplate-stripped JD), `training_set` (vw_label_set deduped), `cross_validate` (StratifiedKFold, out-of-fold probs, fold-mean AUC + precision@20), `train` (joblib to `db/models/<version>.joblib`, `models` row, `notes` JSON carries `fit_weight` / warnings / params), `hard_negatives`, `load_latest` (None when no model, file gone, or sklearn missing), `predict`, `predict_with_terms` (one transform per batch; tf-idf × coef top positives), `top_terms`, `signal_report`.
-- **`pipeline.py`**: `screen(model=…)` fills `fit_prob` + `top_terms` (only rows with JD text), `model_version` = the model's version, `combine` gets `fit_weight` from the model; `daily(use_model=True)` loads the newest model and marks the Model stage on in the report.
-- **`finder.py`**: `labels [--report] [--pseudo N] [--seed N]`, `train [--cv 5] [--C 4.0] [--report]` (always prints the hard-negative list); `screen --no-model` and `rescreen-all --no-model` now work; `report` stamps the latest screens' model version.
-- scikit-learn 1.9.1, numpy 2.5.3, scipy 1.18.1, joblib 1.6.0 installed in `.venv` (requirements.txt keeps them commented as optional). CLAUDE.md repo map updated.
-- **Tests: 53 passing** (46 + 7 new: boilerplate/jd_section, passed-reason classes, vault loaders incl. pipeline-file skip, pseudo-negatives + sync_labels rebuild, training-set dedupe, train/predict/top_terms/load_latest, screen with a model).
-
-## Phase 2 deviations (for the Fable audit)
-1. **Pipeline-written Jobs_Found files are not label sources** (`# Jobs Found — ATS pipeline` marker). Their blocks and passed rows are the rules' own output; training on them would teach the model to echo the rules.
-2. **Passed rows are filtered by reason** (`classify_passed_reason`): `stale` (closed / expired / already tracked / duplicate) and `logistics` (location or pay only, with no fit word) are skipped. On the vault: 101 logistics, 44 stale, 24 duplicate skipped; 356 fit-reason rows kept (label 0, text only when matched: 20). A location-only pass (e.g. the Verizon CX row) is a good function in a bad place, not a text negative.
-3. **Escalated blocks use the same 800-char minimum** as applications (text NULL below it, so they count but do not train). Blocks end at `---`, the next `# Company:`, an H1, or a file-level `## ` section (older hand-made files run blocks back to back; `## Description:` stays inside a block).
-4. **Dedupe in `training_set`**, priority application > decision > escalated > passed > pseudo: one doc per posting_id; a decision row is dropped when a vault doc with matching company + similar title exists (the tracker decisions otherwise double-count applications with the ATS copy of the same JD), and its posting_id stays reserved so no lower source relabels it. Pseudo-negatives exclude every application/escalated positive and every `build` decision posting.
-5. **Applications also carry a posting match** (Apply URL or company + title): 52 of 297 matched; used only for dedupe and signal AUCs.
-6. `sync_labels` **replaces** the four vault/pseudo sources each run (DELETE + INSERT in one transaction) rather than upserting, so a deleted folder disappears.
-7. `train` also reports **AUC vs non-pseudo negatives only** and positives' mean fit held-out vs in-sample, because pseudo-negatives are easy and inflate the headline AUC.
-8. `top_terms` are computed for every row with a JD (rejects included), so a rule reject with a high fit is visible for auditing the title gate.
-
-## §11 Phase 2 acceptance — results (scratch DB)
-- [x] `pytest -q`: **53 passed**.
-- [~] `finder.py labels --report`: **395 positives with text** (≥ 250 ✅: application 282, decision 45, escalated 68) · **35 non-pseudo negatives with text** (< 150: application 15, passed 20) → **warning path exercised**: `fit_weight` 0.15. 1,500 pseudo-negatives. After dedupe: 1,880 training docs (347 pos / 1,533 neg, 33 non-pseudo neg). 20 s.
-- [x] `finder.py train --report`: **5-fold AUC 0.985** (≥ 0.85 ✅) · precision@20 0.960 · **positives' mean fit 0.80 held-out** / 0.89 in-sample (> 0.7 ✅) · confusion@0.5 tp 321 / fp 65 / fn 26 / tn 1,468 · AUC vs non-pseudo negatives only **0.741** (the honest number: 33 real negatives). 43 s.
-- [x] Hard-negative list printed and plausible: top label-0 docs are the user's own near-miss passes (McKesson Sr Dir Business Modernization 0.98, RGP Finance Transformation PM 0.94, Peraton BPI Lead 0.93, Sysco AI Transformation Office PMO 0.91, CareFirst Business Readiness 0.87, Guidehouse Internal Control & BT 0.83), one NFCU passed row (comp/level) 0.96, and pseudo-negatives that really are adjacent (GE Vernova Plant Leader 0.87, Agilent AVP Manufacturing 0.84, Amgen Clinical System Ops Sr Dir 0.75).
-- [x] `top_terms` in the Fit stanza read sensibly, e.g. `**Fit: ~46%.** rule 30 · fit 0.87 · top terms: transformation, change management, lean, strategic, operational, change · tier 2`; data-lane rows show `analytics, business intelligence, data, bi`.
-- [x] `finder.py rescreen-all` with the model: **327 s** (rules-only was 209 s). Verdicts candidate 73 / review 193 / reject 77,511 (±2 vs Phase 1: the rules version changed with the 13:50 place fix).
-- [x] `sweep_ats.py --skip-sweep --detail-budget 0 --db <scratch>` with a scratch vault: model loaded, screen 0 rows (current), report + 6 snapshots. No-sklearn path: with `sys.modules['sklearn'] = None` and a `models` row present, `load_latest` logs "rules only" and screens write model `none`; `test_finder_import_pulls_no_optional_dependencies` still passes.
-- [x] Personal-pattern scan empty; `db/models/`, `db/snapshots/` untracked.
-
-## §11 eyeball — Phase 2 (scratch DB, rules f1451d3ad1e9 · model 12bd55424307)
-| Check | Result |
+## §11 eyeball after §13
+| Row | Result |
 |---|---|
-| Henry Schein R134977 | ✅ **rank 1** of vw_shortlist, final **62** partial, tier 1, rule 50, **fit 0.93**, terms transformation, strategic, sigma, lean, improvement, change management. |
-| Top of vw_shortlist | 62 Henry Schein (T1, fit .93) · 58 M&T Sr Organizational Change Mgr (fit .94) · 52 / 50 QTS GPO x2 (T1, fit .82 / .92) · 50 Amgen AVP AI&D Scaled Ops & Transformation (fit .78) · 48 State Street Global OpEx Lead (rule 55 but **fit .28**, dropped from 1st to 6th) · 47 Angi Principal Analytics Eng (T3) · 46 GE Vernova Transformation Leader · 44 McKesson Dir IT OCM, Centene Dir Provider Data Process Owner, Perficient Dir OCM. |
-| GPO titles | QTS x2 review (fit .82/.92); Agilent HR Ops GPO reject on location (fit .78); McKesson "GPO Strategy" (purchasing GPO) reject, fit .18 ✅. |
-| USAA | BPC Lead candidate, final 38, fit .32; BPO Intern reject, fit .15. |
-| Verizon CX Transformation | reject on location (unchanged), fit .26. |
-| fit_prob by verdict (active) | reject avg .114 (2,129 ≥ 0.5) · review avg .27 (35 ≥ 0.5) · candidate avg .416 (27 ≥ 0.5). |
-| Label rows' mean fit in screens | application+ .604 (n 50) · decision .572 (45) · escalated .717 (11) · passed .299 (20) · application− .176 (2) · pseudo .097 (1,500; in-sample). |
-| Bands / blocks | partial 10, weak 69, none 77,698. **Default bar still gives 0 blocks** (max final 62). With the low-data fit weight 0.15 the blend is `(0.40·rule + 0.15·fit·100) / 0.55`, so strong (70) needs rule ≥ ~57 and fit ≈ 1; rule tops out at 65. `--block-min-band weak`: 15 blocks. |
-| Signal AUCs (`train --report`, labeled rows with a screen) | rule_score .844 all / .448 non-pseudo · fit (held-out) .982 / .836 · blend .602 / .516 (a rule reject forces final 0, and most labeled postings reject on location). |
-| High fit, no tier (title gate misses) | Honeywell "Director Operational Ex" (truncated title) .96 · Phil, Inc "Director of Business Operations, Client Optimization" .95 (off-function title only) · Amgen "Strategic Planning & Operations Manager" .99 · Novartis "Assoc Dir, Governance & Operations" .94 — evidence for the funnel question below. |
+| Henry Schein R134977 | **82 strong**, rank 1, rule 69, fit .97, review (flag: ask above band top). |
+| Top of vw_shortlist | 82 Henry Schein · 76 Amgen AVP AI&D Scaled Ops & Transformation (fit .93) · 73 QTS GPO Capital Delivery · 73 M&T Sr Org Change Mgr · 71 QTS GPO Capacity (flag mid level, 7 yrs) · 70 Perficient Dir OCM · 69 McKesson Sr BI & Automation Analyst (T3) · 67 Angi Principal Analytics Eng · 66 Centene Dir Provider Data Process Owner · 65 Freddie Mac Strategic Transformation AI Sr Lead. |
+| State Street Global OpEx Lead | fit **.28 → .50**, rule 69, **reject on location** (hybrid 2–4 days/week in Quincy MA / Boston / Princeton / Irvine / Austin / Atlanta / Sacramento; the listing never says DC). |
+| Marriott Sr Director, Change Management and Associate Engagement | was rejected as "below target level (associate)"; now **review 62 partial**, fit .97. |
+| Honeywell Director Operational Excellence (x3) | reject: plant-floor scope + not commutable; "Director Operational Ex" also outside the US (MX). |
+| Amgen FP&A Manager (Shanghai) | reject: outside the US (CN). |
+| Phil, Inc Director of Quality Excellence | still reject on `off-function title` only (fit .90): the title gate question below. |
+| Junior / early-career on tiered rows | Summer Associate internships (early-career), Process Optimization Specialist (max 3 yrs), Sr Associate Data Analytics (max 3 yrs, IN). |
 
-Eyeball SQL (Phase 2 additions; Phase 1 queries are in git history of this file):
-```sql
-SELECT rules_version, model_version, count(*) FROM vw_screen_latest GROUP BY 1, 2;
-SELECT s.verdict, count(fit_prob), round(avg(fit_prob), 3), count(*) FILTER (WHERE fit_prob >= 0.5)
-  FROM vw_screen_latest s JOIN postings p USING (posting_id) WHERE p.status = 'active' GROUP BY 1;
-SELECT final_score, band, tier, rule_score, round(fit_prob, 2), employer, title, top_terms FROM vw_shortlist LIMIT 15;
-SELECT v.rank, v.final_score, v.band, v.tier, v.rule_score, round(v.fit_prob, 2), v.top_terms
-  FROM (SELECT row_number() OVER (ORDER BY final_score DESC, first_seen_at DESC) AS rank, * FROM vw_shortlist) v
-  JOIN postings p USING (posting_id) WHERE v.employer ILIKE 'henry schein%' AND p.url LIKE '%R134977%';
-SELECT p.employer, p.title, s.verdict, s.tier, s.final_score, round(s.fit_prob, 2) FROM vw_screen_latest s JOIN postings p USING (posting_id)
-  WHERE p.title ILIKE '%global process owner%' OR p.title ILIKE '%gpo%';
-SELECT round(s.fit_prob, 2), p.employer, p.title, s.reasons FROM vw_screen_latest s JOIN postings p USING (posting_id)
-  WHERE p.status = 'active' AND s.tier IS NULL ORDER BY s.fit_prob DESC NULLS LAST LIMIT 12;
-SELECT count(*) FILTER (WHERE band IN ('very_strong', 'strong')), count(*) FILTER (WHERE final_score >= 50), max(final_score) FROM vw_shortlist;
-SELECT l.source, l.label, count(*), round(avg(s.fit_prob), 3) FROM vw_label_set l JOIN vw_screen_latest s USING (posting_id) GROUP BY 1, 2;
-```
+Eyeball script: `SELECT` families over `vw_screen_latest` joined to active postings (as in the Phase 1/2 blocks in git history), plus `rules.required_years(html.unescape(description_text))` over every active JD for the years distribution.
 
-## Open questions / decisions for the user or the auditor
-- **Real negatives are the bottleneck** (35 with text). The fastest lift is `finder.py mark <id> pass --reason …` on shortlist rows the user would not build, or passing rows in the next Jobs_Found Decision column; each one with a JD becomes a label. At 150 the fit weight returns to 0.35 and strong blocks become reachable.
-- **No `strong` blocks yet** (max 62). Options: accept until labels grow; run `report --block-min-band partial` meanwhile; or revisit `LOW_DATA_FIT_WEIGHT` (0.15 is the spec value).
-- **Title gate vs model:** 2,129 active rule rejects have fit ≥ 0.5; many are `off-function title` only. Widening TITLE_FUNCTION_TERMS (e.g. "operational ex", "business operations", "operations planning") is a profile change; alternatively a future rule could downgrade `off-function title` to a flag when fit ≥ ~0.9.
-- **Blend AUC below fit alone** because hard rejects score 0; expected by design, but the weights in §6 were not tuned (Phase 2 only reports).
-- Faith flag text in `screen.py` still hard-codes a comp range (pre-existing). `vw_dmv_or_remote_active` is still a coarse regex.
-- Surfacing: the Phase 1 report runs on scratch recorded `surfaced` rows, so Henry Schein et al. are excluded from new blocks there for 14 days (scratch only).
+## Open questions / decisions
+- **Title gate (not changed in §13).** 76,593 active rows carry `off-function title`; 10,198 reject on title alone. Proposed next amendment: title becomes points, not a gate; with level now decided by years + pay and non-US excluded, the content model + JD rules carry rejection. Measure on scratch before/after.
+- **Paired source gap 0.15** remains (see above).
+- **Blend AUC 0.608** is expected (rejects score 0); §6 weights still untuned.
+- **Peraton (iCIMS) — feasibility checked 15:10, not built.** Every `*.icims.com` URL (Peraton, Cadmus, Girl Scouts, HarperCollins) returns an AWS WAF captcha (HTTP 405), so a generic iCIMS adapter is not possible from the shell. Peraton's own Webflow site exposes all **1,458 jobs** through a public Typesense search index (JSON, 250/page, 6 requests; key + host scraped from `www.careers.peraton.com/search-jobs` at run time): title, req id, primary location, workplace (on-site 1,183 / hybrid 180 / remote 95), pay text, full JD (responsibilities + qualifications HTML). `datePosted` only from the per-job page's JSON-LD. Estimate ~½ day as a `typesense` platform adapter. Registry row today: `Peraton,icims,…,unresolved` (listed twice). Decision for the user: build it or not.
+
+## Phase 2 — what was built (before §13; carried for the audit)
+- `labels.py` (vault loaders, posting match, pseudo-negatives, sync_labels), `features.py` (TF-IDF + LR, CV, hard negatives, top terms, load_latest), pipeline model integration, `finder.py labels` / `train`. Phase 2 deviations 1–8 from the first build are superseded where §13 differs (labels, dedupe priority still holds, low-data rule).
 
 ## Phase 1 — what was built (carried for the audit)
 - **`backend/finder/`**: `version.py` (rules_version hash over RULES_CODE_VERSION + every profile constant, sets/dicts sorted), `rules.py` (row→Listing, JD rules: travel, direct reports, domain tenure, discipline, corridor, assessment gate, hours cap, sales ops, tier-3 coding test; `screen_row`; rule points), `pipeline.py` (rescreen predicate, streamed batches, `combine`, `daily`), `tracker_sync.py` (tracker parser + exact/fuzzy match + tracker decisions), `report.py` (Jobs_Found writer per §7, `surfaced` bookkeeping, snapshots, `parse_decisions`, `read_back`).
