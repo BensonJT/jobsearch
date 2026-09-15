@@ -1,124 +1,108 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 11:20 EDT (Claude Code on Vostro). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-15 13:05 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
+
+## Active Sprint
+@/docs/SPRINT_PLAN.md — **Phase 1 built and committed locally (not pushed). Next: Fable audits Phase 1 against §11, then Phase 2 (labels + TF-IDF/LR).** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` and gitignored `backend/profile_local.py`.
 
 ## ⚠️ Running right now (check first)
 
-A chained JD backfill started 2026-09-15 07:42 EDT, plus a queued Amentum ingest. Both run in the background on Vostro via `nohup`, so they survive clearing the Claude context but **not** a reboot, WSL shutdown, or OOM.
+| Stage | State at 12:54 EDT |
+|---|---|
+| Workday all-titles JD backfill (`output/run_backfill_day.sh`, stage 3) | **Running.** CVS Health 10,800/15,943, ~60 JDs/min now (slower than the morning), so `=== DONE` ≈ 14:20. |
+| Amentum ingest | Queued behind `=== DONE`. **The waiter was replaced at 12:32** by `output/after_backfill_amentum_v2.sh` (same command plus `--no-screen`), because the new default finder stage would otherwise have screened the live DB and written a Jobs_Found file into the vault during an ingest. Logs append to `output/amentum_ingest_20260915.log`. |
 
-| Order | Stage | State at 11:16 EDT |
-|---|---|---|
-| 1 | Oracle, all titles | **Done 09:54.** 15,134 JDs, 214 taken down, 48 errors. |
-| 2 | Workday, prefiltered titles | **Done 10:01.** 2,296 JDs, 13 taken down, 33 errors. |
-| 3 | Workday, all titles (`--detail-budget 50000 --detail-all`) | **Running.** 29,968 of 46,218 JDs, 96 taken down, 279 errors (<1%, transient per-posting; they stay NULL and a later backlog run retries). ~400 JDs/min, so done ≈ 12:00. CVS Health (15,943) is the long pole. |
-| 4 | Amentum ingest (`--employer amentum --detail-all`) | Queued; starts on `=== DONE`, ~10 min. |
+Check: `grep '^===' output/backfill_20260915_day.log; tail -3 output/amentum_ingest_20260915.log; ps -eo pid,etime,args | grep -E '[a]fter_backfill|[s]weep_ats.py'`
 
-**Check progress:**
-```bash
-cd ~/code/jobsearch
-grep '^===' output/backfill_20260915_day.log        # "=== DONE" when stages 1-3 finish
-tail -3 output/backfill_20260915_day.log
-tail -3 output/amentum_ingest_20260915.log          # "=== AMENTUM DONE" when stage 4 finishes
-ps -eo pid,etime,cmd | grep -E '[r]un_backfill_day|[a]fter_backfill_amentum|[s]weep_ats.py'
-```
+**After both finish, first live finder run:** `.venv/bin/python finder.py rescreen-all` (≈3.5 min on local disk; slower on the external drive), then `finder.py sync`, then `finder.py report` when you want a file. From then on `sweep_ats.py` runs the finder stage itself; `--no-screen` / `--no-report` skip it.
 
-**While these run:** DuckDB allows one writer, so do not open `db/jobsearch.duckdb` in another process, even read-only (the open fails), and do not start another sweep. Scratch-DB work (`--db /some/other/path` + `JOBSEARCH_REGISTRY_DIR` pointing at a scratch registry) is fine and is how the Eightfold/Paylocity adapters were live-tested today.
+## Phase 1 — what was built
+- **`backend/finder/`**: `version.py` (rules_version hash over RULES_CODE_VERSION + every profile constant, sets/dicts sorted), `rules.py` (row→Listing, JD rules: travel, direct reports, domain tenure, discipline, corridor, assessment gate, hours cap, sales ops, tier-3 coding test; `screen_row`; rule points), `pipeline.py` (rescreen predicate, streamed batches, `combine`, `daily`), `tracker_sync.py` (tracker parser + exact/fuzzy match + tracker decisions), `report.py` (Jobs_Found writer per §7, `surfaced` bookkeeping, snapshots, `parse_decisions`, `read_back`).
+- **`finder.py`** CLI: `screen`, `rescreen-all`, `report`, `mark`, `sync`, `shortlist` (Phase 2–4 subcommands not added yet). Global `--db` and `--vault`.
+- **Schema v3** (`store.py`): screens, tracker, decisions, embeddings, label_docs, models, readback_log, **surfaced** (§4.5); views vw_screen_latest, vw_decisions, vw_shortlist, vw_label_set; macro vw_scored_new(days). `schema_info` bumps 2→3 on open.
+- **Sweep integration:** `run(screen=True, report=True, llm_top=0, full_screen=False)`; flags `--no-screen`, `--no-report`, `--llm-top`, `--full-screen`. Finder imported lazily; a finder exception is logged and the run log is still written.
+- **Profile split:** public constants per §5 in `profile.py` (+ `CODING_TEST_TERMS`, `SALES_OPS_PATTERN`); neutral example values in `profile_local.example.py`; appendix values in gitignored `profile_local.py`. `.gitignore` gains db/models, db/snapshots, rubric_local.py. `.env.template`, `requirements.txt`, CLAUDE.md updated.
+- **Tests:** 44 passing (19 existing + 25 in `tests/test_finder.py`, all on the neutral example profile).
 
-**If the machine restarted mid-run:** nothing is lost beyond the last unsaved chunk (commits every 100 JDs per board). Rerun the interrupted stage; postings that already have a JD are skipped. Chain scripts: `output/run_backfill_day.sh`, `output/after_backfill_amentum.sh` (gitignored).
+## Deviations from the spec (for the Fable audit)
+1. **Card-level discipline test superseded on full JDs.** `screen.py` §4 matches substrings ("implant" → "plant") and was written for 500-char snippets; `rules.screen_row` drops its three discipline outputs and uses `discipline_rule` (word-bounded, plural-tolerant, lane counterweight) instead. `sweep.py` behaviour is unchanged.
+2. **Travel span reason uses `B >= 2·M`** (spec says `>`), so the appendix example "20-50%" with a 25% limit is a reason, matching "doubles the limit".
+3. **`REQUIRED_HEADINGS` adds** `requirements|qualifications|what you have|what you bring`; `PREFERRED_HEADINGS` adds `sets you apart` (USAA's JD uses "What you have:" / "What sets you apart:"). Heading = a line ≤60 chars, ≤6 words, no final period.
+4. **`sales_ops_rule` pattern** is `SALES_OPS_PATTERN`: "pipeline" only as sales/revenue/deal/opportunity pipeline or pipeline management/generation/coverage; CRO only uppercase. The literal spec list would have rejected data-pipeline and pharma-CRO roles.
+5. **`hours_cap_rule`:** bare "part-time" counts only in the title, `employment_type = part_time`, or "this/a part-time role/position…". The literal regex flagged 196 tiered rows from benefits boilerplate (incl. the Verizon row via "part-timers"); now 3. Hourly pay is cleared only when the pay is hourly.
+6. **`direct_reports_rule`** also reads "team of N" / "staff of N" with the number after.
+7. **Tier 3 + assessment gate** is made meaningful with `CODING_TEST_TERMS` (HackerRank, Codility, coding assessment, take-home…) → reason on tier 3 only (memory: data lane only without a coding-test gate).
+8. **`is_commutable`** is unchanged in code (hybrid flag alone was already not commutable); docstring states it. The `$…K ask` flag in `screen.py` now reads `P.COMP_ASK` instead of a hard-coded figure (output identical).
+9. **Writes** use one JSON string per batch expanded with `json_transform` into a temp table; reads stream from a second cursor. Binding Python lists as DuckDB params cost ~0.8 ms per element (500-row batch: 3.6 s to bind vs 0.01 s to insert/update) — the first full screen was >10 min; now 209 s.
+10. `write_jobs_found` has `table_cap=150`; `report` CLI adds `--block-min-band` and `--since-hours`; `vw_shortlist` joins `SELECT DISTINCT matched_posting_id FROM tracker`.
+11. vault_dir may be the vault root (as `.env` has it) or the Job_Search folder; `tracker_sync.job_search_dir` resolves both. (Note: the old `sweep.py` assumes the Job_Search folder, so its tracker dedup is silently off with the current `.env`.)
 
-**After everything finishes:** run the coverage query. Then a **normal full sweep** (`.venv/bin/python sweep_ats.py`) picks up the four new boards (Microsoft ≈2,240 postings + ~30 min of JDs on its first pass; Omnicell; Liberty Mutual; Logos).
+## §11 acceptance — results (scratch DB, copied 12:30 while the backfill was still writing: 77,777 active, 69,618 with a JD)
+- [x] `pytest -q`: 44 passed.
+- [~] `finder.py screen --full`: **209 s** (< 10 min ✅) on local disk. Verdicts **candidate 73 / review 191 / reject 77,513** — candidate+review is **264, not the low thousands** the spec expected. Only 1,184 active rows have a tier at all (function hit in the title); of those, 764 reasons are "not remote and outside the commute area".
+- [~] `finder.py report`: parses cleanly (no stray headings, blank lines around every `---`, `# Company:` = `**Fit` = blocks). **Default bar gives 0 blocks**: rules-only `rule_score` tops out at 65 by construction (tier1 30 + extra hits 10 + senior 5 + remote 10 + comp 10), so nothing reaches `strong` (70) until Phase 2 adds `fit`. Scores seen: max 55; bands partial 2, weak 74. With `--block-min-band weak`: 15 blocks, 15 summary rows, 200 passed rows.
+- [~] `finder.py sync`: **336 tracker rows, 56 matched (fuzzy), 0 exact** (no Posting ID column yet) — below the spec's >100. Of the 280 unmatched, 151 are employers not in the ATS registry; the other 129 have the employer but a genuinely different req (closest Jaccard ≤ 0.57, e.g. "Program Manager, Operational Excellence" vs "Program Manager"). Threshold left at 0.6 on purpose. Exact matches arrive once the tracker carries Posting IDs (Phase 5).
+- [x] `JOBSEARCH_VAULT_DIR=<scratch vault> sweep_ats.py --skip-sweep --detail-budget 0 --db <scratch>`: tracker sync 6.2 s → read-back 0 → screen 0 rows (already current) → Jobs_Found written → 6 snapshot files → 10.3 s total. `--no-screen` runs with no finder output. sklearn is not installed in `.venv`, so every run above proves the no-sklearn path; a test also asserts no optional module is imported.
+- [x] Personal-pattern scan empty; `git status` shows no db/models, db/snapshots, rubric_local.py, profile_local.py.
+
+## §11 eyeball (scratch DB, rules 2dc5f061d008 · model none)
+Pay figures in comp flags are redacted as `<ask>`/`<top>` here (public repo).
+
+| Expectation | Result |
+|---|---|
+| Henry Schein R134977 Sr Mgr AI Transformation & Process Excellence: tier 1, top 20 | ✅ **tier 1, rank 2** of vw_shortlist, score 50, review (flag: `<ask> sits above the <top> top`). |
+| PFG Global Process Owner Director: tier 1 | ⚠️ **Not in the corpus** (PFG is on BrassRing, no adapter). Other GPO titles: QTS "GPO - Capacity Strategy & Planning" tier 1 rank 7 (flag: plant vocabulary "utilities"); QTS "GPO - Capital Delivery" tier 1; Agilent "HR Operations - GPO" tier 1 reject on location. |
+| QIAGEN / Lonza / Kite corridor plant roles: reject | ⚠️ **None of the three employers is in the corpus.** Nearest case: Agilent "Process Engineer - Advanced" (Frederick, **Colorado**) rejects on `different discipline (plant/industrial: manufacturing)` + `corridor manufacturing (required: chemical)` — the corridor rule matched a Colorado Frederick. Rockville Guidehouse/M&T rows are review, not plant. |
+| Equinix Dir Business Process Excellence: sales-ops reason only if GTM/CRO in Required | ⚠️ **Not in the corpus.** Corpus-wide among tiered rows: 44 `sales/revenue ops scope` reasons, 16 vocabulary flags. |
+| USAA "10+ years banking" row: domain-tenure flag, not reject | ⚠️ **No such JD.** USAA "Bank Business Process Consultant Lead" (San Antonio) is **candidate**, score 40; its only years line is "8 years of experience in business process consultation…", no banking term, so no flag is correct. A second copy of that req rejects on location. 34 domain-tenure flags corpus-wide (never a reason), e.g. Centene "Director, Provider Data Process Owner" `domain-tenure gate (insurance, 7 yrs)`. |
+| Verizon CX Transformation & Change Manager: not comp-rejected | ✅ **Not comp-rejected** (band top above the floor). ⚠️ It **is rejected on location**: Rolling Meadows IL / Temple Terrace FL, workplace_type NULL, so not remote and not commutable — consistent with the 09-14 manual pass on the same row. |
+| Crossover: reject `assessment-gated` | ⚠️ **Not in the corpus.** The rule fires elsewhere: SAIC (cognitive assessment), GE Vernova x2 (aptitude test). |
+| NFCU Manager II BPO (closed): in history, never in shortlist | ⚠️ **Not in the corpus** (NFCU's 167 Oracle rows hold no business-process title). vw_shortlist filters `status = 'active'` and a closed row cannot appear (tested). |
+
+Top of vw_shortlist: 55 State Street "Global Operational Excellence Lead" (T1) · 50 Henry Schein (T1) · 45 M&T "Senior Organizational Change Manager" · 45 Wells Fargo "…Operational Excellence" (T1) · 40 ServiceNow, Booz Allen, USAA BPC Lead, Centene, Amgen, Included Health, QTS GPO (T1), McKesson.
+
+Eyeball SQL (run with `duckdb.connect(<scratch>)`; the full script lives in the session scratchpad, re-create from these):
 ```sql
-SELECT platform, count(*) FILTER (WHERE description_text IS NOT NULL) AS with_jd,
-       count(*) AS active, count(*) FILTER (WHERE description_text IS NULL) AS missing
-FROM vw_active GROUP BY 1 ORDER BY active DESC;
-SELECT * FROM vw_board_health WHERE NOT ok;
+SELECT s.verdict, count(*) FROM vw_screen_latest s JOIN postings p USING (posting_id) WHERE p.status = 'active' GROUP BY 1;
+SELECT s.band, s.tier, count(*) FROM vw_screen_latest s JOIN postings p USING (posting_id) WHERE p.status = 'active' GROUP BY 1, 2;
+SELECT v.rank, v.final_score, v.tier, v.verdict, v.flags FROM (SELECT row_number() OVER (ORDER BY final_score DESC, first_seen_at DESC) AS rank, * FROM vw_shortlist) v
+  JOIN postings p USING (posting_id) WHERE v.employer ILIKE 'henry schein%' AND p.url LIKE '%R134977%';
+SELECT p.employer, p.title, s.verdict, s.tier, s.final_score, s.reasons, s.flags FROM vw_screen_latest s JOIN postings p USING (posting_id) WHERE p.title ILIKE '%global process owner%';
+SELECT p.employer, p.title, p.location_primary, s.verdict, s.reasons FROM vw_screen_latest s JOIN postings p USING (posting_id)
+  WHERE p.status = 'active' AND s.tier IS NOT NULL
+    AND regexp_matches(coalesce(p.location_primary,'') || ' ' || coalesce(p.locations,''), 'germantown|walkersville|frederick|gaithersburg|rockville|clarksburg|urbana', 'i');
+SELECT count(*) FROM postings WHERE regexp_matches(employer, 'equinix|crossover|qiagen|lonza|kite|performance food', 'i');   -- 0
+SELECT p.title, s.verdict, s.tier, s.final_score, s.reasons, s.flags FROM vw_screen_latest s JOIN postings p USING (posting_id) WHERE p.employer ILIKE 'usaa%' AND s.tier IN (1, 2);
+SELECT p.location_primary, p.locations, p.workplace_type, s.verdict, s.reasons, s.flags FROM vw_screen_latest s JOIN postings p USING (posting_id)
+  WHERE p.employer ILIKE 'verizon%' AND p.title ILIKE '%cx transformation%';
+SELECT p.employer, p.title, s.reasons FROM vw_screen_latest s JOIN postings p USING (posting_id) WHERE s.reasons::VARCHAR LIKE '%assessment-gated%';
+SELECT split_part(split_part(r, ' (', 1), ':', 1) AS reason, count(*) FROM (SELECT unnest(from_json(s.reasons, '["VARCHAR"]')) AS r
+  FROM vw_screen_latest s JOIN postings p USING (posting_id) WHERE p.status = 'active' AND s.tier IS NOT NULL) GROUP BY 1 ORDER BY 2 DESC;
+SELECT match_kind, count(*) FROM tracker GROUP BY 1;
 ```
-Baseline before today's backfill: 78,154 active, 13,061 with a JD. After it: expect ~60,000+ with a JD.
 
-## What this session did (2026-09-14 → 09-15)
+## Open questions / decisions for the user or the auditor
+- **No `strong` blocks in Phase 1** (rule-only max 65). Accept until Phase 2 adds fit, or run `report --block-min-band weak` meanwhile? The daily sweep report uses the default bar.
+- **Funnel is narrow** (264 non-reject): the title gate (TITLE_FUNCTION_TERMS) decides tier; 76,593 active rows have no function term in the title. Widening is a profile change, not code.
+- **`frederick` matches Frederick, Colorado** (corridor + commutable). The substring-based `is_commutable` also matches "Fredericksburg". Consider state-qualified places in `profile_local.py`.
+- **Faith flag text in `screen.py`** still hard-codes a comp range (pre-existing; left alone because `sweep.py` output must not change).
+- **Live DB on the external drive:** the 209 s figure is on local disk. Expect the first `rescreen-all` on E: to be slower (one commit per 500 rows; the UPDATE touches `postings`); the daily path screens only new/changed rows.
 
-### Audit → ingestion rebuilt to spec
-The first full run on 2026-09-14 completed (126 boards, 18,093 postings, 23.3 min) before an unrelated OOM crash. The audit found:
-- **~60% of runtime was DuckDB per-row autocommit** over the WSL 9p mount to the E: drive.
-- **The 1,000-job cap falsely closed postings** on large boards.
-- **`posted_at` was collected and then dropped.**
-- **Workday and Oracle rows had no JD** and collapsed locations.
-
-Rebuilt `backend/ats/`:
-- **Whole-board pulls, no cap, 8 boards in parallel.** `--max-pages` is only a safety valve, and a truncated pull skips the close pass.
-- **One transaction per board** through a staging table with `INSERT … ON CONFLICT DO UPDATE`. A req is updated in place and never re-added. It is closed (`closed_at`) the first clean run it's missing, reopened if it returns, and never deleted, so the JD corpus accumulates for later TF-IDF work.
-- **Schema v2**, one normalized `postings` table: location_primary, locations (JSON), country, workplace_type, employment_type, job_family, job_level, pay_* with pay_source, posted_at, posting_end_at, description_fetched_at, and raw_json holding the platform record verbatim. Migration from v1 was automatic. A `.v1-backup-20260915` copy sits beside the DB and can be deleted.
-- **Views and parameterized macros** in `store.py`: `new_postings(days)`, `posted_within(days)`, `taken_down(days)`, `title_match(regex)`, `title_match_new(regex, days)`, `text_match(regex)`, `vw_active`, `vw_remote_active`, `vw_dmv_or_remote_active`, `vw_board_health`, `vw_posting_lifetimes`, `vw_pay_annualized`.
-- **Adapters:** Workday, Oracle ORC, Greenhouse, Lever, Ashby, plus new Workable, BambooHR and SmartRecruiters. The faith boards from the vault's daily faith sweep are now in the DB too. Retries on transient errors. Workday underscore tenants are reached via `wdN.myworkdaysite.com`. Oracle accepts an empty site number, which means the tenant's default site.
-- **Detail stage:** new postings get their JD automatically (`--new-detail-cap`, default 5000, every title). The older backlog then gets `--detail-budget` (default 300, newest first, prioritized by the regex in `prefilter.py`). A 404 on detail closes the posting. Commits happen every 100 JDs.
-- **Tests:** `tests/test_ats.py`, 11 passing, no network.
-- **Full run after the rebuild:** 17.4 min, 124 of 125 boards ok, 76,431 live postings, 111 taken down.
-
-### Registry fixes (the CSV lives in the vault, outside this repo)
-- **Single registry file as of 09-15 ~09:45:** `ats_registry_candidates.csv` was merged into `ats_registry.csv` (174 rows, 133 sweepable, verified identical to the two-file load) and deleted. The loader no longer reads a candidates file.
-- **Resolved:** General Motors `Careers_GM`, Philips `jobs-and-careers`, Wells Fargo (tenant returns `total=0` after page 1, fixed in the adapter), CFA Institute, Forward Financing (slug with a space), SAIC (empty Oracle site).
-- **Added:** Credence (Workable) and Amentum (Workday `pae` / `wd1` / `Amentum_Careers`, 2,756 live). amentumcareers.com is a Clinch front end behind AWS WAF, and the iCIMS site is retired.
-- **Removed as duplicates:** Optum (was pointed at Michael Baker's Oracle host) and Meridial (Invisible's board). Alma is folded into Spring Health (`springhealth66`).
-- **Registry now sweeps ~133 boards:** Workday 55, Greenhouse 38, Ashby 14, Oracle 10, Lever 7, SmartRecruiters 4, BambooHR 3, Workable 2.
-
-### Public GitHub prep
-- **`origin` = git@github.com:BensonJT/jobsearch.git** (public). `optiplex-backup` remains the one-way backup.
-- **Personal data is out of the repo.** Pay thresholds and home location live in gitignored `backend/profile_local.py`, with a neutral template at `profile_local.example.py`. Registry and dedup paths live in gitignored `.env` (`JOBSEARCH_REGISTRY_DIR`, `JOBSEARCH_VAULT_DIR`). Forbidden terms live in gitignored `.personal_patterns`, and the pre-commit scan is in CLAUDE.md. `docs/archive/` and old output CSVs are deleted.
-- **History squashed to one root commit `6fde054`** and force-pushed. GitHub, Vostro and OptiPlex were each verified at one clean commit. The pre-squash backup `~/code/jobsearch_history_backup_20260915.bundle` still contains personal history. Keep it off GitHub and delete it when no longer needed.
-- **README rewritten** for a public audience: how a run works, platforms, finding registry identifiers, querying, schema, performance, limitations, responsible use. `.env.template` rewritten to match what the code reads.
-- The old March `main.py` harvester stack was deleted.
-
-### Eightfold adapter (09-15, ~10:30)
-- **New platform `eightfold`** in `backend/ats/adapters.py`: identifier_1 = careers host URL, identifier_2 = company domain. Two list flavors exist and the adapter tries both: `apply/v2/jobs` (Liberty Mutual; Microsoft returns 403) then `pcsx/search` (Microsoft, Omnicell). Both page 10 at a time regardless of `num`. The list JD is a truncated preview, so `apply/v2/jobs/<id>` detail always supplies it (works even where the apply/v2 list is refused). Row key is Eightfold's own posting id; the display job id is reused across locations (21 of Microsoft's 2,240).
-- **Page drift:** a single timestamp-ordered pull of Microsoft stored 2,208–2,219 of 2,240 (postings refreshed mid-pull shift the pages). Fix: read in both orders (timestamp, then relevance), union on Eightfold id, and report Truncated (no close pass) if the union is more than 0.5% (min 3) short of the board's count. Microsoft now takes ~200 s per sweep.
-- **Live test on a scratch DB:** Omnicell 78, Liberty Mutual 210, Microsoft 2,237 of 2,237–2,240, no duplicates, 0 errors, 30 JDs fetched cleanly. 5 unit tests added (16 total).
-- **Registry:** Microsoft and Omnicell rows already had the right identifiers. Liberty Mutual's row was fixed to `https://libertymutual.eightfold.ai` / `libertymutual.com`. First full sweep of Microsoft will fetch up to 2,240 JDs (~30 min at ~75/min).
-- **Taleo is not buildable for the registry's employers:** UHG's careersections (10000/10020/10050) all 302 to the Radancy front end at careers.unitedhealthgroup.com (JSON wrapper around rendered HTML, 8.6 MB per page); Centric is Taleo *Business Edition* at `phg.tbe.taleo.net/phg02` (`org=CENTCONS&cws=38`), which serves HTML only. README's unsupported list says so now. A Radancy adapter would cover UHG + L3Harris but means parsing HTML fragments.
-
-### Paylocity adapter (09-15, ~11:05)
-- **New platform `paylocity`**: identifier_1 = company GUID, identifier_2 = slug. The documented v2 feed returns an empty list for Faithlife/Logos, so the list stage reads the `window.pageData` JSON block on `recruiting/jobs/All/<guid>/<slug>` (title, location, remote flag, department, date). Its Description is a ~110-char teaser, so the detail stage reads `div.job-preview-details` on each job's Details page (full text, Job Type, pay). A bad GUID 302s to JobNotFound and is raised as a board failure, not an empty board.
-- **Live:** Logos Bible Software 6 live, 6 JDs, pay parsed on two ($125–135K Data Scientist US). The user's apply URL carried only the numeric JobId; the GUID came from the Details page's all-jobs link. Registry row updated in the vault (Faithlife LLC is the legal entity). 3 unit tests (19 total).
-- **README** now states the one HTML exception honestly (embedded JSON + one description block).
-
-## ⭐ ACTIVE SPRINT: build the job-finding layer — `docs/SPRINT_PLAN.md` is the binding contract
-
-Designed and approved 2026-09-15 (Fable session). **Builder: Opus (high/xhigh). Auditor: Fable, against SPRINT_PLAN §11.** Read `docs/SPRINT_PLAN.md` first, then the vault's `Professional/Areas/Job_Search/Tools/Finder_Build_Personal_Appendix.md` for the personal values (never into tracked files). `GEMINI_API_KEY` and `GEMINI_API_MODEL` are already in `.env`. Develop on a scratch DB copy until the backfill below prints `=== DONE`. The brainstorm notes below are superseded by the sprint plan.
-
-## (superseded) NEXT SESSION: design the "job finding" layer
-
-**The question the user posed (11:20 EDT):** how do we build filtering that replicates what he asks Cowork / Claude Code to do by hand when scanning the JD corpus? i.e. turn "read these 60,000 descriptions and tell me which ones are me" into something that runs in the pipeline.
-
-**What already exists (start from these, don't rebuild):**
-- `postings` has reserved columns `screen_verdict`, `screen_score`, `screen_reasons`, `screened_at` — empty so far.
-- `backend/screen.py` is a working **card-level** rule engine (verdicts `candidate` / `review` / `reject`, every row keeps reasons) built for the aggregator sweep; `backend/profile.py` holds the vocab: `FUNCTION_PHRASES`, `TITLE_FUNCTION_TERMS`, `PRECISE_TITLE_TERMS`, `JUNIOR_TITLE_TERMS`, `OFF_LANE_TITLE_TERMS`, `PLATFORM_GATED_TERMS`, `PLANT_DISCIPLINE_TERMS`, `CLEARANCE_TERMS`, `ITSM_CHANGE_TERMS`, `HARD_AVOID_INDUSTRY_TERMS`, `AI_GIG_TITLE_TERMS`; pay/location in gitignored `profile_local.py`. It takes a `Listing` dataclass, not a `postings` row — an adapter from row → Listing is the cheap first step.
-- `backend/ats/prefilter.py` `DETAIL_TITLE_PATTERN` is the broad title net (budgeting only; it over-includes on purpose).
-- SQL macros already do crude finding: `title_match`, `title_match_new`, `text_match(regex)` over title+JD, `vw_pay_annualized`, `vw_dmv_or_remote_active`.
-- The vault's `jd_bucketize.py` (resume_ide_v2) extracts JD requirements into buckets with Gemma via Google AI Studio (~2 min/JD) — too slow for 60k, fine for a shortlist.
-
-**Ground truth to load before designing (memory files):** `user_target_role_shape` (ops process excellence, Vz/NFCU shape; NOT product ops / plant-floor CI / domain-gated excellence; travel ≤25%; ≤4 reports), `user_coding_assessment_constraint` (LSS/GPO/BPO/OpsEx is the PRIMARY lane; data/BI secondary and only without an assessment gate), `user_compensation_anchor` ($190K ask), `user_cloud_experience_depth`, `user_bi_tool_stack` (no Power BI/Tableau), `feedback_rejection_patterns` (zero company-level skips), `user_nfcu_office_commute`, `feedback_glassdoor_search_mechanics` (the search strings that work per board are the human version of the rule set).
-
-**Facts that shape the design:**
-- Corpus: ~78k active postings across 137 boards, ~60k with full JD after today; ~2–5k new per day; a daily run fetches only that day's new JDs. Whatever the finder is, it must run on the day's new rows in minutes, and be re-runnable over the whole corpus when rules change (reasons stored per row make that auditable).
-- Rules alone got the aggregator sweep to "few worth opening"; what the user does by hand on top is semantic (shape of role, level, lane, disqualifiers buried in the JD). Candidate layering: (1) SQL/rule pass on title + structured fields (cheap, everything), (2) JD-text rules (clearance, assessment gate, platform-gated, plant-floor, travel %, reports), (3) an LLM pass only on what survives (hundreds/day, not thousands) scoring against the memory ground truth, writing `screen_score` + reasons, (4) a daily shortlist view / markdown. Local Gemma (jd_bucketize) or Claude for step 3 — cost/latency is the decision.
-- Keep personal rules out of the public repo: the profile split (`profile.py` = structure, `profile_local.py` = the user's numbers/places) is the pattern to extend; the LLM rubric would need the same split.
-
-## Pending / next session
-- [x] Liberty Mutual registry row fixed 09-15 ~10:45.
-- [ ] **Confirm the backfill chain and Amentum ingest finished**, then run the coverage query above.
-- [x] Pushed 09-15 ~11:10 (user authorized: "after you commit you can push").
-- [ ] **Screen engine / job finding:** see the NEXT SESSION brief above — brainstorm first, then build.
-- [ ] **Daily schedule** for the full sweep (cron / Task Scheduler). A normal day fetches only that day's new JDs.
-- [ ] **Long tail:** iCIMS (8 employers, bot check), Dayforce (blocked), and Taleo/Eightfold/Phenom/SuccessFactors/ADP/UKG/Paylocity (no adapter yet).
-- [ ] **Registry gaps:** 7 "generic slug, VERIFY" Ashby/Greenhouse rows (Summer and Tilt look like the wrong company). ProSidian's SmartRecruiters id is unresolved. Generic front-door URLs (ADP, Paylocity, SuccessFactors, Dayforce, AppOne) need company-specific URLs.
-- [ ] **Aggregator keys** (Adzuna, Jooble, USAJobs) aren't in Vostro's `.env`, so `sweep.py` skips all three there. Copy them from OptiPlex if that sweep is wanted on Vostro.
-- [ ] **Consider generating the vault's daily faith-board markdown from the DB** instead of the separate `faith_board_sweep.py`.
-- [ ] **Cleanup:** delete `db/jobsearch.duckdb.v1-backup-20260915` and, when comfortable, the history bundle.
+## Pending (carried)
+- [ ] Confirm the backfill + Amentum finished; run the coverage query (`SELECT platform, count(*) FILTER (WHERE description_text IS NOT NULL), count(*) FROM vw_active GROUP BY 1`), then the first live `finder.py rescreen-all` + `sync`.
+- [ ] Normal full sweep afterwards picks up Microsoft / Omnicell / Liberty Mutual / Logos.
+- [ ] Daily schedule (cron / Task Scheduler).
+- [ ] Long tail adapters: iCIMS, Dayforce, Radancy (UHG, L3Harris), BrassRing (PFG).
+- [ ] Registry gaps: 7 "generic slug, VERIFY" rows; ProSidian SmartRecruiters id.
+- [ ] Aggregator keys missing from Vostro `.env`; `sweep.py` JOBSEARCH_VAULT_DIR shape mismatch (above).
+- [ ] Cleanup: `db/jobsearch.duckdb.v1-backup-20260915`, the history bundle, `output/after_backfill_amentum.sh` (superseded).
 
 ## Run
 ```bash
-.venv/bin/python sweep_ats.py                                   # full sweep + new-posting JDs + 300 backlog JDs
-.venv/bin/python sweep_ats.py --employer "capital one"          # one employer
-.venv/bin/python sweep_ats.py --skip-sweep --detail-budget 5000 --detail-all   # backlog JDs only
-.venv/bin/python -m pytest -q                                   # tests
-./run_sweep.sh [days]                                           # aggregator pre-screen (needs keys in .env)
+.venv/bin/python sweep_ats.py                                   # sweep + JDs + finder stage (tracker sync, screen, report, snapshots)
+.venv/bin/python sweep_ats.py --no-screen                       # sweep only
+.venv/bin/python finder.py rescreen-all                         # after a profile/rules change
+.venv/bin/python finder.py shortlist --days 7 --n 30
+.venv/bin/python finder.py mark <posting_id|url|"employer|title"> pass --reason "..."
+.venv/bin/python -m pytest -q
 ```
