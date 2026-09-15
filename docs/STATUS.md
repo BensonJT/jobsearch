@@ -1,11 +1,11 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 16:30 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-15 17:15 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
 
 ## Active Sprint
 @/docs/SPRINT_PLAN.md — **Phase 2 built, amended by user decision as §13 (labels, source invariance, level, workplace, non-US) and §14 (content-first scoring; the title no longer rejects when the JD was scored). All committed locally, not pushed. Next: user review of the §14 shortlist (precision question below), Fable audit of Phase 2 + §13 + §14, then Phase 3 (embeddings).** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` and gitignored `backend/profile_local.py`.
 
-All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,777 active / 69,618 with a JD). It carries `label_docs`, model **`c1f56157feaf`**, and screens under rules **`a78e37bd2f70`** · model **`c1f56157feaf`** (the §13 screens under rules `823be4a70f67` are still in `screens` for comparison). scikit-learn 1.9.1 / numpy / scipy / joblib are installed in `.venv`.
+All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,777 active / 69,618 with a JD). It carries `label_docs`, model **`c1f56157feaf`**, and screens under rules **`a844b0d2d80d`** · model **`c1f56157feaf`** (earlier screens under `823be4a70f67` (§13) and `a78e37bd2f70` (§14 before the fixes) remain in `screens` for comparison). scikit-learn 1.9.1 / numpy / scipy / joblib are installed in `.venv`.
 
 ## ⚠️ Running right now (check first)
 - Workday all-titles backfill: **`=== DONE` 14:18.**
@@ -17,6 +17,13 @@ All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,77
 - `screens.rule_score` = the **profile score** (level, location, pay, title on 0–100). Final = 0.5·content + 0.5·profile; no content → profile capped at 60; minus 5 per flag (cap 25); tier-3 cap 80; LLM blend last.
 - **Content gate:** with a scored JD, `off-function title` / `off-lane title` no longer reject (off-lane becomes a flag); fit < 0.35 → reason `content does not fit`; fit < 0.50 → flag `content fit borderline`. No JD or no model → the title gate stands.
 - `RULE_POINTS`, `SCORE_WEIGHTS`, `rule_points`, `rule_max` removed. Fit stanza reads `profile N · fit x · …`. **Tests: 61 passing.**
+
+## §14 fixes — found on Henry Schein R134977 (17:00)
+- **Years parser** missed "Typically 10 or more years of progressive experience", so the bullseye scored level "not stated" (60). `required_years` now reads "10 or more years", "15 years or more of experience", "a minimum of ten (10) years", "at least eight years'", "five to seven years", "(8) years", "Experience: 12+ years" (number phrase before the year word; "experience" in the same sentence; "18 years old" excluded).
+- **Double penalty:** flags a component already prices cost no points (`UNPENALIZED_FLAG_PATTERNS`: ask above band top, local/hybrid, nationwide listing, mid level, few years asked, content fit borderline, faith signal). They stay visible and still send the posting to review.
+- Rescreen 451 s under rules `a844b0d2d80d`: candidate 227 · review 1,545 · reject 76,005. Shortlist bands very_strong 57 · strong 465 · partial 1,104 · weak 124. Active rows: `junior level` reasons 21,731 (was 19,303: more years phrases parsed), `mid level` flags 7,567.
+- **Henry Schein R134977: rank 1, 96 very_strong** (profile 95: level 100 / location 100 / pay 75 / title 100; fit .97). Then Humana AVP Corp Dev Integration 95 · Amgen AVP AI&D Scaled Ops 95 · CVS VP & COO Medical Affairs 93 · M&T Sr Org Change Mgr 93 · USAA HR Integration & Planning Principal 93 · Humana Portfolio Enablement Lead 93 · Centene Sr Dir Medical Economics 92.
+- **Tests: 63 passing.**
 
 ## §14 results (scratch DB, rescreen 440 s)
 - Verdicts **candidate 43 → 225 · review 184 → 1,570 · reject 77,550 → 75,982**. Transitions: reject → candidate 203, reject → review 1,481; candidate → reject 17, review → reject 99 (all `content does not fit`: mostly Capital One / ICF / Guidehouse / Leidos data engineers, Booz Allen Digital Transformation Specialist / Architect, RTX SAP / Kinaxis data transformation).
@@ -61,7 +68,8 @@ All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,77
 Eyeball script: `SELECT` families over `vw_screen_latest` joined to active postings (as in the Phase 1/2 blocks in git history), plus `rules.required_years(html.unescape(description_text))` over every active JD for the years distribution.
 
 ## Open questions / decisions
-- **§14 precision (decide next).** 394 strong-or-better rows is more than a review queue can hold, and the top is crowded by senior generalist roles the model reads as fits. Levers, none built: (a) **function-coded pass decisions**: `finder.py mark <id> pass --reason function` counts as a content negative, while nuance / logistics passes stay context only (honours §13: a vault JD is never a negative, but an explicit 'wrong function' is); (b) **harder pseudo-negatives**: sample senior corporate postings with no function term instead of the whole corpus; (c) **Phase 3 embeddings**: similarity to the jobs actually pursued, averaged into content; (d) raise the strong bar for tier-less titles, or give the title more than 5%.
+- **Context, not vocabulary (discussed 17:10, user leaning, no build decision yet).** The TF-IDF model scores shared vocabulary (transformation, governance, change management), not context, so senior roles in other functions score .85–.93 (CVS VP & COO Medical Affairs, Novartis Dir AI Foundations Engineer). Proposed: **requirement coverage**, which splits a JD into requirement / responsibility lines, matches each by sentence embedding against evidence of the user's background, and reports "N of M matched, unmatched: …" as the main content signal (the `jd_bucketize` coverage idea at search time). Evidence source to confirm with the user: master bullets + contexts in the local `resume` DB, `Bio_Jeff_Professional.md`, the Signature Method document, pursued JDs (read at run time from vault / local DB, never copied into the repo). Plus the Phase 4 LLM rubric read on the top 30–50. The TF-IDF model stays as the cheap 0.35 content gate. Multiply-blend idea set aside (it fixes volume, not context).
+- **§14 precision (earlier framing).** 394 strong-or-better rows is more than a review queue can hold, and the top is crowded by senior generalist roles the model reads as fits. Levers, none built: (a) **function-coded pass decisions**: `finder.py mark <id> pass --reason function` counts as a content negative, while nuance / logistics passes stay context only (honours §13: a vault JD is never a negative, but an explicit 'wrong function' is); (b) **harder pseudo-negatives**: sample senior corporate postings with no function term instead of the whole corpus; (c) **Phase 3 embeddings**: similarity to the jobs actually pursued, averaged into content; (d) raise the strong bar for tier-less titles, or give the title more than 5%.
 - ~~Title gate~~ — replaced by the §14 content gate.
 - **Paired source gap 0.15** remains (see above).
 - **Blend AUC 0.608** is expected (rejects score 0); §6 weights still untuned.
