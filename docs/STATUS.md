@@ -1,16 +1,30 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 15:40 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-15 16:30 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
 
 ## Active Sprint
-@/docs/SPRINT_PLAN.md — **Phase 2 built, then amended the same afternoon by user decision (§13: labels, source invariance, level, workplace, non-US, rule rescale). Both committed locally, not pushed. Next: Fable audits Phase 2 + §13 against §11, then Phase 3 (embeddings).** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` and gitignored `backend/profile_local.py`.
+@/docs/SPRINT_PLAN.md — **Phase 2 built, amended by user decision as §13 (labels, source invariance, level, workplace, non-US) and §14 (content-first scoring; the title no longer rejects when the JD was scored). All committed locally, not pushed. Next: user review of the §14 shortlist (precision question below), Fable audit of Phase 2 + §13 + §14, then Phase 3 (embeddings).** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` and gitignored `backend/profile_local.py`.
 
-All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,777 active / 69,618 with a JD). It carries `label_docs`, model **`c1f56157feaf`**, and screens under rules **`823be4a70f67`** · model **`c1f56157feaf`**. scikit-learn 1.9.1 / numpy / scipy / joblib are installed in `.venv`.
+All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,777 active / 69,618 with a JD). It carries `label_docs`, model **`c1f56157feaf`**, and screens under rules **`a78e37bd2f70`** · model **`c1f56157feaf`** (the §13 screens under rules `823be4a70f67` are still in `screens` for comparison). scikit-learn 1.9.1 / numpy / scipy / joblib are installed in `.venv`.
 
 ## ⚠️ Running right now (check first)
 - Workday all-titles backfill: **`=== DONE` 14:18.**
 - Amentum ingest (`output/after_backfill_amentum_v2.sh`, `--no-screen`): **running at 14:30** (400/2,768 JDs, ~10 JDs/min per 100 → roughly an hour). Check: `tail -3 output/amentum_ingest_20260915.log; ps -eo pid,etime,args | grep -E '[a]fter_backfill|[s]weep_ats.py'`.
 - **After it finishes, first live run:** `finder.py labels --report` → `train --report` → `rescreen-all` (7.5 min on local disk with the model; slower on E:) → `sync` → `report` when a file is wanted. A new rules or model version makes every active row due, so the first sweep after a retrain does a full rescreen.
+
+## §14 content-first scoring — what changed (user decision, 2026-09-15 ~16:00)
+- Weights (`SCORE_COMPONENT_WEIGHTS`): **content 50 · level 20 · location 15 · pay 10 · title 5**. Points: level senior 100 / mid 50 / not stated 60; location remote 100 / commutable hybrid 80 / commutable on-site or unstated 70 / nationwide unverified 60; pay band top at ask 100 / at floor 75 / not posted 60 (unposted is unknown until a screen); title tier 1 100 / tier 2 70 / tier 3 50 / none 30 / off-lane 0.
+- `screens.rule_score` = the **profile score** (level, location, pay, title on 0–100). Final = 0.5·content + 0.5·profile; no content → profile capped at 60; minus 5 per flag (cap 25); tier-3 cap 80; LLM blend last.
+- **Content gate:** with a scored JD, `off-function title` / `off-lane title` no longer reject (off-lane becomes a flag); fit < 0.35 → reason `content does not fit`; fit < 0.50 → flag `content fit borderline`. No JD or no model → the title gate stands.
+- `RULE_POINTS`, `SCORE_WEIGHTS`, `rule_points`, `rule_max` removed. Fit stanza reads `profile N · fit x · …`. **Tests: 61 passing.**
+
+## §14 results (scratch DB, rescreen 440 s)
+- Verdicts **candidate 43 → 225 · review 184 → 1,570 · reject 77,550 → 75,982**. Transitions: reject → candidate 203, reject → review 1,481; candidate → reject 17, review → reject 99 (all `content does not fit`: mostly Capital One / ICF / Guidehouse / Leidos data engineers, Booz Allen Digital Transformation Specialist / Architect, RTX SAP / Kinaxis data transformation).
+- Bands (active): **very_strong 44 · strong 350** · partial 886 · weak 472. vw_shortlist: 1,773 rows, 1,259 at ≥ 50, max 95. Only 1 shortlist row lacks a JD.
+- Reason families (active): not remote/outside commute 63,582 · **content does not fit 62,635** · outside the US 20,429 · junior level 19,303 · off-function title **8,135** (was 76,593; now only rows without a scored JD) · comp 7,472 · early-career 5,238 · off-lane title 2,637.
+- Rescued at the top (were `off-function title` rejects): Humana AVP Corporate Development Integration & Value Creation 95 (fit .97) · USAA HR Integration & Planning Principal 93 · CVS VP & COO Medical Affairs 93 · Centene Sr Dir Medical Economics 92 · Perficient Sr PM AI Data 92 · Angi Dir Large Pro Operations 91 · USAA HR Enablement Director 90 · Phil, Inc Dir of Business Operations, Client Optimization 89 · QTS Dir Procurement Systems & Analytics 89 · Humana Portfolio Enablement Lead 88.
+- Named rows: Henry Schein 83 strong (was 82, rank 1; now below the rescued rows) · M&T Sr Org Change Mgr 88 · Marriott Sr Dir Change Management 83 strong · State Street reject (location) with `content fit borderline (0.50)` flag.
+- **Precision concern (for the user):** 24 of the top 30 have no function term in the title. Very-strong is dominated by remote Director/VP/AVP roles with pay not posted or at the ask (profile ≈ 93) and fit .80–.90, several outside the lane (CVS VP & COO Medical Affairs, Novartis Director AI Foundations Engineer, Humana Creative Operations Director, Centene VP Medicare Care Management). The fit model separates "senior corporate knowledge work" from the random corpus well, but not near misses from bullseyes: its negatives are easy. See open questions.
 
 ## §13 amendments — what changed (user decisions, 2026-09-15 afternoon)
 - **Negatives rethought.** Nothing in the vault is a negative: pass / not-pursuing folders are near-miss positives (weight 0.5); passed rows and `pass` decisions are context only, never trained. Negatives = 1,500 pseudo-negatives (random JDs with no function term in the title). The low-data fit weight (0.15) no longer triggers: 362 positives / 1,500 pseudo-negatives → fit weight back to 0.35.
@@ -47,7 +61,8 @@ All numbers below are from **`db/finder_scratch.duckdb`** (E:, gitignored; 77,77
 Eyeball script: `SELECT` families over `vw_screen_latest` joined to active postings (as in the Phase 1/2 blocks in git history), plus `rules.required_years(html.unescape(description_text))` over every active JD for the years distribution.
 
 ## Open questions / decisions
-- **Title gate (not changed in §13).** 76,593 active rows carry `off-function title`; 10,198 reject on title alone. Proposed next amendment: title becomes points, not a gate; with level now decided by years + pay and non-US excluded, the content model + JD rules carry rejection. Measure on scratch before/after.
+- **§14 precision (decide next).** 394 strong-or-better rows is more than a review queue can hold, and the top is crowded by senior generalist roles the model reads as fits. Levers, none built: (a) **function-coded pass decisions**: `finder.py mark <id> pass --reason function` counts as a content negative, while nuance / logistics passes stay context only (honours §13: a vault JD is never a negative, but an explicit 'wrong function' is); (b) **harder pseudo-negatives**: sample senior corporate postings with no function term instead of the whole corpus; (c) **Phase 3 embeddings**: similarity to the jobs actually pursued, averaged into content; (d) raise the strong bar for tier-less titles, or give the title more than 5%.
+- ~~Title gate~~ — replaced by the §14 content gate.
 - **Paired source gap 0.15** remains (see above).
 - **Blend AUC 0.608** is expected (rejects score 0); §6 weights still untuned.
 - **Peraton (iCIMS) — feasibility checked 15:10, not built.** Every `*.icims.com` URL (Peraton, Cadmus, Girl Scouts, HarperCollins) returns an AWS WAF captcha (HTTP 405), so a generic iCIMS adapter is not possible from the shell. Peraton's own Webflow site exposes all **1,458 jobs** through a public Typesense search index (JSON, 250/page, 6 requests; key + host scraped from `www.careers.peraton.com/search-jobs` at run time): title, req id, primary location, workplace (on-site 1,183 / hybrid 180 / remote 95), pay text, full JD (responsibilities + qualifications HTML). `datePosted` only from the per-job page's JSON-LD. Estimate ~½ day as a `typesense` platform adapter. Registry row today: `Peraton,icims,…,unresolved` (listed twice). Decision for the user: build it or not.
