@@ -77,7 +77,7 @@ Rebuilt `backend/ats/`:
 
 ### Paylocity adapter (09-15, ~11:05)
 - **New platform `paylocity`**: identifier_1 = company GUID, identifier_2 = slug. The documented v2 feed returns an empty list for Faithlife/Logos, so the list stage reads the `window.pageData` JSON block on `recruiting/jobs/All/<guid>/<slug>` (title, location, remote flag, department, date). Its Description is a ~110-char teaser, so the detail stage reads `div.job-preview-details` on each job's Details page (full text, Job Type, pay). A bad GUID 302s to JobNotFound and is raised as a board failure, not an empty board.
-- **Live:** Logos Bible Software 6 live, 6 JDs, pay parsed on two ($125–135K Data Scientist US). the user's apply URL carried only the numeric JobId; the GUID came from the Details page's all-jobs link. Registry row updated in the vault (Faithlife LLC is the legal entity). 3 unit tests (19 total).
+- **Live:** Logos Bible Software 6 live, 6 JDs, pay parsed on two ($125–135K Data Scientist US). The user's apply URL carried only the numeric JobId; the GUID came from the Details page's all-jobs link. Registry row updated in the vault (Faithlife LLC is the legal entity). 3 unit tests (19 total).
 - **README** now states the one HTML exception honestly (embedded JSON + one description block).
 
 ## ⭐ ACTIVE SPRINT: build the job-finding layer — `docs/SPRINT_PLAN.md` is the binding contract
@@ -105,7 +105,7 @@ Designed and approved 2026-09-15 (Fable session). **Builder: Opus (high/xhigh). 
 ## Pending / next session
 - [x] Liberty Mutual registry row fixed 09-15 ~10:45.
 - [ ] **Confirm the backfill chain and Amentum ingest finished**, then run the coverage query above.
-- [x] Pushed 09-15 ~11:10 (the user authorized: "after you commit you can push").
+- [x] Pushed 09-15 ~11:10 (user authorized: "after you commit you can push").
 - [ ] **Screen engine / job finding:** see the NEXT SESSION brief above — brainstorm first, then build.
 - [ ] **Daily schedule** for the full sweep (cron / Task Scheduler). A normal day fetches only that day's new JDs.
 - [ ] **Long tail:** iCIMS (8 employers, bot check), Dayforce (blocked), and Taleo/Eightfold/Phenom/SuccessFactors/ADP/UKG/Paylocity (no adapter yet).
