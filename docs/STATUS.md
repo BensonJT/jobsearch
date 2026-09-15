@@ -54,7 +54,8 @@ Rebuilt `backend/ats/`:
 - **Tests:** `tests/test_ats.py`, 11 passing, no network.
 - **Full run after the rebuild:** 17.4 min, 124 of 125 boards ok, 76,431 live postings, 111 taken down.
 
-### Registry fixes (the CSVs live in the vault, outside this repo)
+### Registry fixes (the CSV lives in the vault, outside this repo)
+- **Single registry file as of 09-15 ~10:00:** `ats_registry_candidates.csv` was merged into `ats_registry.csv` (174 rows, 133 sweepable, verified identical to the two-file load) and deleted. The loader no longer reads a candidates file.
 - **Resolved:** General Motors `Careers_GM`, Philips `jobs-and-careers`, Wells Fargo (tenant returns `total=0` after page 1, fixed in the adapter), CFA Institute, Forward Financing (slug with a space), SAIC (empty Oracle site).
 - **Added:** Credence (Workable) and Amentum (Workday `pae` / `wd1` / `Amentum_Careers`, 2,756 live). amentumcareers.com is a Clinch front end behind AWS WAF, and the iCIMS site is retired.
 - **Removed as duplicates:** Optum (was pointed at Michael Baker's Oracle host) and Meridial (Invisible's board). Alma is folded into Spring Health (`springhealth66`).
