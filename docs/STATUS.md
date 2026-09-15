@@ -1,9 +1,9 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 18:00 EDT (Claude Code / Opus on Vostro). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-16 (Claude Code / Fable on Vostro; §16 audit amendment). Overwrite at the end of each session; git history is the changelog._
 
 ## Active Sprint
-@/docs/SPRINT_PLAN.md — **Built and committed locally (not pushed): Phase 1, Phase 2, amendments §13 (labels, source invariance, level, workplace, non-US) and §14 (content-first scoring + fixes). Written, not built: §15 (Phase 3 = requirement coverage against the user's evidence; Phase 4 review ledger; public-user context design). Next: Fable audit (below), then build Phase 3 per §15.** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` (§1 profile, §2 rubric, §5 evidence sources) and gitignored `backend/profile_local.py`.
+@/docs/SPRINT_PLAN.md — **Built and committed locally (not pushed): Phase 1, Phase 2, amendments §13 (labels, source invariance, level, workplace, non-US) and §14 (content-first scoring + fixes). Written, not built: §15 (Phase 3 = requirement coverage against the user's evidence; Phase 4 review ledger; public-user context design). Next: build Phase 3 per §15 **as amended by §16** (Fable audit 2026-09-16: hard-negative calibration, credit-not-similarity kind weights, requirement specificity + required-vs-role coverage, years lines keep skill content, `light_in_record`, coverage proven at weight 0 before blending, stale-rubric ledger rule, two LLM prompt profiles for the free vs paid Gemini tier).** Personal values live in the vault's `Tools/Finder_Build_Personal_Appendix.md` (§1 profile, §2 rubric, §5 evidence sources) and gitignored `backend/profile_local.py`.
 
 ## Fable audit request (2026-09-15 evening; tokens permitting, else next day)
 1. **Phases 1–2 as built** against §11, **as amended by §13 and §14**: read this file, run `.venv/bin/python -m pytest -q` (63), `finder.py shortlist --days 30 --n 30 --db db/finder_scratch.duckdb`, the eyeball SQL in the sections below and in git history of this file, and diff `backend/profile.py` against §5/§13/§14.
