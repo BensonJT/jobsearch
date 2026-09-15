@@ -1,6 +1,6 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 ~11:00 ET (Claude Code on Vostro). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-15 ~12:15 ET (Claude Code on Vostro). Overwrite at the end of each session; git history is the changelog._
 
 ## ⚠️ Running right now (check first)
 
@@ -75,10 +75,15 @@ Rebuilt `backend/ats/`:
 - **Registry:** Microsoft and Omnicell rows already had the right identifiers. Liberty Mutual's row was fixed to `https://libertymutual.eightfold.ai` / `libertymutual.com`. First full sweep of Microsoft will fetch up to 2,240 JDs (~30 min at ~75/min).
 - **Taleo is not buildable for the registry's employers:** UHG's careersections (10000/10020/10050) all 302 to the Radancy front end at careers.unitedhealthgroup.com (JSON wrapper around rendered HTML, 8.6 MB per page); Centric is Taleo *Business Edition* at `phg.tbe.taleo.net/phg02` (`org=CENTCONS&cws=38`), which serves HTML only. README's unsupported list says so now. A Radancy adapter would cover UHG + L3Harris but means parsing HTML fragments.
 
+### Paylocity adapter (09-15, ~12:15)
+- **New platform `paylocity`**: identifier_1 = company GUID, identifier_2 = slug. The documented v2 feed returns an empty list for Faithlife/Logos, so the list stage reads the `window.pageData` JSON block on `recruiting/jobs/All/<guid>/<slug>` (title, location, remote flag, department, date). Its Description is a ~110-char teaser, so the detail stage reads `div.job-preview-details` on each job's Details page (full text, Job Type, pay). A bad GUID 302s to JobNotFound and is raised as a board failure, not an empty board.
+- **Live:** Logos Bible Software 6 live, 6 JDs, pay parsed on two ($125–135K Data Scientist US). the user's apply URL carried only the numeric JobId; the GUID came from the Details page's all-jobs link. Registry row updated in the vault (Faithlife LLC is the legal entity). 3 unit tests (19 total).
+- **README** now states the one HTML exception honestly (embedded JSON + one description block).
+
 ## Pending / next session
 - [x] Liberty Mutual registry row fixed 09-15 ~11:30.
 - [ ] **Confirm the backfill chain and Amentum ingest finished**, then run the coverage query above.
-- [ ] **Push local commits** (`git push`; plain push, no force needed now).
+- [x] Pushed 09-15 ~12:15 (the user authorized).
 - [ ] **Screen engine:** run `backend/screen.py` rules against `postings` → `screen_verdict` / `screen_score`. Build the SQL views/macros for job scenarios on top.
 - [ ] **Daily schedule** for the full sweep (cron / Task Scheduler). A normal day fetches only that day's new JDs.
 - [ ] **Long tail:** iCIMS (8 employers, bot check), Dayforce (blocked), and Taleo/Eightfold/Phenom/SuccessFactors/ADP/UKG/Paylocity (no adapter yet).
