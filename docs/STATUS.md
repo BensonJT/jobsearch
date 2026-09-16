@@ -42,6 +42,55 @@ _Last updated: 2026-09-15 evening (Claude Code / Opus on Vostro; Phase 3a built 
 5. **What does work:** the source-invariance fix (0.14-point paired gap), specificity (boilerplate down to 0.26), the evidence pipeline (matches are dominated by `resume_bullets` and `soar_stories`, the achievement-kind sources, exactly as intended), and the unit cache (warm re-cover 132 s).
 6. **Symptom worth seeing:** ranking survivors by `coverage_required` puts GitLab "Staff Backend Engineer" (77.0), Guidehouse "Data Platform Lead" (73.0) and "Adobe Commerce Sr. Solutions Architect" (63.7) on top — short, terse requirement lists with few units, where noise dominates.
 
+## The labeling run (sprint plan §17) — 2,573 graded labels, 2026-09-15 night
+**Done:** every screen survivor (1,940 postings in 78 batches) plus a deliberate 599-posting reject sample, graded
+by Claude Sonnet subagents against `rubric.RUBRIC_PUBLIC` + `RUBRIC_PERSONAL`. **0 rows rejected on import.**
+Distribution: **bullseye 205 · adjacent 332 · stretch 319 · wrong 1,717**.
+
+### What it proves about Levels 1 and 1.5 (the question worth the tokens)
+| band | bullseye | adjacent | stretch | wrong | n | good |
+|---|---|---|---|---|---|---|
+| very_strong | 24 | 17 | 17 | 20 | 78 | **53%** |
+| strong | 33 | 50 | 43 | 92 | 218 | **38%** |
+| partial | 6 | 9 | 6 | 55 | 76 | **20%** |
+| weak | 0 | 1 | 1 | 5 | 7 | **14%** |
+
+The rules + fit model order the corpus correctly at the band level — a clean monotonic gradient. **But the score
+cannot separate degrees of fit:** mean final score by grade is bullseye 82.0 · adjacent 80.0 · stretch 79.8 ·
+wrong 72.8. It tells `wrong` from the rest by ~8 points and tells the other three apart not at all. That is the
+precision problem, quantified.
+
+### Level 1's miss rate, measured for the first time (599 graded rejects)
+wrong 472 (79%) · stretch 50 · **adjacent 44 · bullseye 33 — about 13% of rejects are work the user should see.**
+Cause of each good rejection: not remote / outside commute 57 · outside the US 34 · **content does not fit 24** ·
+comp below floor 13 · junior level 9. Location, country and comp rejections are correct. **The content gate is the
+defect:** it killed Amentum "Business Process Specialist" at fit **0.12** and Booz Allen "Digital Transformation
+Specialist" at 0.34 — literal primary-lane work discarded as noise by the vocabulary model. Retraining with the new
+negatives is aimed straight at this.
+
+### Agreement with the user's own behaviour
+Of 36 postings the user pursued: **27 agree** (18 bullseye, 9 adjacent), 9 contested (5 stretch, 4 wrong) — 75%.
+Reviewed row by row with the user 2026-09-15:
+- **Judge right (4):** Angi Principal Analytics Engineer (dbt/Snowflake IC, assessment-gated), Zillow Senior Talent
+  Intelligence Analyst (market research; the overlap was mode, not object), both Capital One data-analytics roles
+  (econometrics / model-risk validation).
+- **Judge partly right (1):** Airbnb Senior Programs & Business Operations Lead — graded `wrong`, but the posting
+  exists because "no one owns the demand-side merchandising strategy", which is the user's own pattern. Stretch.
+- **Unjudgeable (2 of the contested, plus 1 more):** Capital One Sr. Business Manager, AHEAD Senior Manager
+  Enterprise Transformation, ADF General Application — the stored text is competency boilerplate or marketing copy.
+- **Judge WRONG (1), and it is a rubric bug:** Fannie Mae "Strategic Workforce Planning - Principal" asks for
+  designing an enterprise workforce-planning **framework**, buy-in without authority, and workforce cost/capacity
+  trade-offs in a regulated environment — the GNO capacity model. The judge downgraded it because the work sits in
+  HR. `RUBRIC_PERSONAL` already says capacity-planning **models** are primary lane and only the staffing cycle is
+  not; the judge applied "domain-gated" to a department instead of to the object of the work. **Fix the rubric line
+  before the next run.**
+
+### Contested labels are excluded, not overruled (user decision)
+The user pushed back on "your decisions outrank the judge", correctly: pursuit decisions were made under pressure
+and are noisy positives. A conflict now means the row is **contested and trained on by neither side**. New table
+`training_exclusions` (schema v6) plus `finder.py judge exclude --posting <id> --reason ...`, and an auto-rule that
+retires any posting the judge called too thin to read (**34 caught**, plus ADF and AHEAD by hand).
+
 ## Live run 2026-09-15 20:11 — coverage on the live DB, second report written
 - **A WSL crash at 19:42 killed the first attempt** mid-coverage (evidence stage had finished at 19:39:59). Nothing
   was lost or corrupted: `requirement_units` commits per 200-posting batch, so 17,038 units survived and the plain
