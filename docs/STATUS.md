@@ -1,6 +1,41 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-16 (Claude Code / Opus, afternoon session). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-16 15:40 EDT (Claude Code / Opus, before a Windows reboot). Overwrite at the end of each session; git history is the changelog._
+
+## AFTER THE REBOOT — do this first (written 15:40 EDT 2026-09-16, just before the user rebooted Windows)
+**Fourth attempt, 15:33, after the user closed apps (Excel etc.):** Windows looked healthy (3,976 MB available, no
+paging, commit free 6,189 MB) and Linux had 5,702 MB. The job STILL sat in `state D wait p9_client_rpc` for its whole
+life, importing torch/transformers over `/mnt/e` at ~1 MB/s (142 MB read in 110 s). I stopped it at 15:35 (exit 143)
+because the user was rebooting. Conclusion: freeing apps is not enough — **the venv on the 9p mount is the problem.
+Stop retrying from `.venv`. Build the native venv first.** The user also cleared context; this block is the handoff.
+
+1. **Confirm nothing is running** (command of its own): `pgrep -af '[f]inder\.py'` → must print nothing.
+2. **Build the native venv** (quiet machine, ~10-15 min, one-time). Current `.venv`: Python 3.14.7, torch 2.14.0+cpu,
+   transformers 5.17.0, sentence-transformers 6.0.1, fastembed 0.8.0, duckdb 1.5.5, scikit-learn 1.9.1.
+   ```bash
+   python3.14 -m venv ~/jobsearch_native/venv      # if 3.14 is missing: uv venv -p 3.14 ~/jobsearch_native/venv
+   ~/jobsearch_native/venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+   ~/jobsearch_native/venv/bin/pip install -r ~/code/jobsearch/requirements.txt
+   ```
+   Also copy the HuggingFace model cache to ext4 if it lives on /mnt (check `HF_HOME`; default `~/.cache` is native).
+3. **Point the launcher at it:** in `~/jobsearch_native/run_calibration.sh` change `.venv/bin/python` →
+   `~/jobsearch_native/venv/bin/python`. The launcher already does single-thread env, `nice`, a Linux-memory watchdog
+   (1,500 MB) and a Windows-commit watchdog (800 MB), and logs `state/wait/read` every 10 s to
+   `~/jobsearch_native/memwatch.log`. The code still `cd`s to `~/code/jobsearch` (on /mnt/e) — small .py reads are fine.
+4. **Refresh the native DB copy** (the E: DB is the source of truth; nothing has written to it since): 
+   `cp /mnt/e/code/jobsearch/db/jobsearch.duckdb ~/jobsearch_native/jobsearch.duckdb`
+5. **Run** `~/jobsearch_native/run_calibration.sh` in the background; watch `calib.log` for `Calibration`/`AUC`/
+   `Traceback`/`WATCHDOG`/`=== END`, and `memwatch.log` for `state D wait p9_client_rpc` with a flat read count (= still
+   on 9p → stop it). Expect import in seconds, not minutes.
+6. **Report** thresholds, AUC by signal, medians, paired gap — and raise the design question below (judged `wrong`
+   negatives are mostly easy; `stretch` is the confusable band). Then §15.7 eyeball → decide 3b.
+7. If coverage still does not rank, the user's "thing to show" is the report-feedback review in the vault
+   (`Professional/Areas/Job_Search/Tools/Report_Feedback_20260916.csv`: `human_grade` = kind of work ignoring level;
+   new `level_fit` column = in_range/stretch_up/out_of_reach). Offer pending: pre-fill `level_fit` on his other
+   confirmed rows once he finishes. Then the QUEUED level ceiling below.
+
+**Push state:** `72167e5 e8431f9 7af64b6 7e55719 346f144` + this STATUS commit are local and unpushed. Ask before pushing
+(run the `.personal_patterns` scan first; it is a public repo).
 
 ## IN FLIGHT — coverage recalibration (two WSL crashes on 2026-09-16; read this first)
 **What was being attempted.** Sprint plan order: retrain → rescreen → **recalibrate coverage against real hard
