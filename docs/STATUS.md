@@ -1,54 +1,102 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 evening (Claude Code / Opus on Vostro; Phase 3a built and measured). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-15 night (Claude Code / Opus on Vostro; the fit model retrained on the graded labels). Overwrite at the end of each session; git history is the changelog._
 
-## NEXT SESSION: START HERE — retrain the fit model on the new labels
-Everything needed is on disk; this file plus `docs/SPRINT_PLAN.md` §17 is the whole handoff.
+## DONE THIS SESSION: the fit model is retrained on the 3,009 graded labels (§17.5 item 1)
+**It worked.** The graded `wrong` / `stretch` rows are now the model's negatives, and the failure the whole
+labeling run was built to fix — a vocabulary model that could not tell a bullseye from a senior generalist
+sharing its words — is gone. Model **`330a4e0ce441`** replaces `ec851b252dc3`.
 
-**The goal in one sentence:** the fit model's negatives are 1,500 random postings, which is why it cannot tell a
-bullseye from a senior generalist that shares its vocabulary. There are now **3,009 graded labels** — use the
-`wrong` and `stretch` rows from the confusable band as the hard negatives it has never had.
+### The number that was never measurable before
+**AUC of positives vs the graded `wrong` rows: 0.946** (vs `stretch` 0.776; using only graded positives, so both
+sides come from the same corpus and the same judge: 0.941 / 0.739). Before this session the only negatives were
+1,500 random postings, so no such AUC existed.
 
-**Design decisions already made (do not relitigate):**
-1. Grade → label: `bullseye` = positive 1.0, `adjacent` = positive 0.6, `stretch` = negative 0.5, `wrong` =
-   negative 1.0. Graded labels are richer than binary; weight them rather than throwing the middle away.
-2. **Skip every posting in `training_exclusions`** (35 rows: unjudgeable text, plus rows the user retired).
-3. **`scorer = 'user-adjudicated'` rows win** over the Sonnet grade for the same posting — that is how the user's
-   review is recorded (Fannie Mae → bullseye; Angi and Zillow → wrong, beating the fact that he applied).
-4. Vault application positives stay positive (§13) **unless** a user-adjudicated row says otherwise.
-5. Wire it through `vw_label_set` / `features.training_set`, not a second training path.
+**Held-out (out-of-fold) fit by grade — the honest separation:** bullseye **0.75** · adjacent **0.62** ·
+stretch **0.46** · wrong **0.19**. The old model's *final scores* by grade were 82.0 / 80.0 / 79.8 / 72.8 — it
+told `wrong` from the rest by ~8 points and told the other three apart not at all. That is now a clean gradient.
 
-**What to measure and report (the whole point):**
-- 5-fold AUC as before, plus **AUC of positives vs the graded `wrong` rows** — the number that was never
-  measurable before.
-- Where the named misfires land against the bullseye: CVS "VP & COO, Medical Affairs", Centene "Senior Director,
-  Medical Economics", Novartis "Director, AI Foundations Engineer" versus Henry Schein R134977. Today all four
-  sit within ~4 points.
-- **Amentum "Business Process Specialist" currently scores fit 0.12 and is a graded bullseye.** If that number
-  does not move, the retrain did not work.
-- Re-run the band crosstab (good-fit rate by band was 53 / 38 / 20 / 14) and the Level 1 miss rate (~13%).
+5-fold AUC **0.947** (was 0.983) and precision@20 **0.990** (was 1.000). **Both falling is the expected and
+correct result**: the old figures were measured against random postings, which any vocabulary model wins. The
+task is now genuinely hard, and 0.947 is against real near misses.
 
-**Then, in order:** re-calibrate coverage against the real hard negatives (`coverage --calibrate` — the 7-negative
-problem is gone), re-run the §15.7 eyeball, and only then decide 3b. Phase 3b stays off until coverage ranks.
+### Acceptance checks from the handoff
+| Check | Before | After | |
+|---|---|---|---|
+| **Amentum "Business Process Specialist (Mid-Level)"** (graded bullseye, killed by the content gate) | fit **0.12**, rejected | fit **0.744**, score 74, `review`/strong | ✅ **the stated pass/fail test** |
+| Henry Schein R134977 (the bullseye) | 96 | **97**, fit 0.992, very_strong | ✅ |
+| Capital One "AI Foundations" misfires | ~95, top 15 | **0.026 / 0.044 fit, rejected** | ✅ |
+| Centene "Senior Director, Medical Economics" (graded stretch) | 93, within 4 pts of the bullseye | 90, **7 points below** | ⚠️ closer than wanted but ordered correctly |
+| Humana "Creative Operations Director" (graded stretch) | in the top 15 | 86, 11 points below | ⚠️ same |
+| Booz Allen "Digital Transformation Specialist" (content-gate false negative) | 0.34, rejected | fit 0.669, score 67, `review` | ✅ |
+| Included Health "Director, Staffing Transformation & Ops" (bullseye) | — | 94, fit 0.901, candidate | ✅ |
 
-```bash
-cd /mnt/e/code/jobsearch
-.venv/bin/python finder.py judge report --csv db/snapshots/llm_labels.csv   # the 3,009 labels, for eyeballing
-.venv/bin/python finder.py labels --report && .venv/bin/python finder.py train --report
-.venv/bin/python finder.py rescreen-all && .venv/bin/python finder.py report   # report is always last
-```
+**Band × grade crosstab, good-fit rate** (good = bullseye + adjacent): very_strong **53% → 92%** · strong
+**38% → 78%** · partial **20% → 33%** · weak **14% → 0%**. Still monotonic, and far steeper.
 
-**Also open:** the user still wants to eyeball ~100 labels; the rubric line about capacity/workforce-planning
-frameworks was fixed after the run, so `rubric_version` has changed and any re-grade will differ from tonight's.
+**Level 1 miss rate:** of every graded posting now rejected, 35 bullseye + 53 adjacent out of 2,252 = **3.9%**,
+down from the ~13% measured on the 599-row reject sample. Different denominator, so treat it as directional
+until a fresh reject sample is graded.
+
+> **Read the crosstab and the miss rate as in-sample.** The model was trained on these labels, so those two
+> tables flatter it. The out-of-fold figures above (AUC 0.946, fit-by-grade 0.75/0.62/0.46/0.19) are the honest
+> ones, and they are what the verdict rests on.
+
+**Rescreen `330a4e0ce441`:** 80,272 rows in 452 s under rules `a844b0d2d80d` — candidate **130** (was 276),
+review **819** (was 1,708), reject 79,323. Bands very_strong 123 · strong 358 · partial 403 · weak 65. The
+screen got much tighter because the model finally disagrees with senior-generalist vocabulary. Report written:
+vault `Search_Results/Jobs_Found_20260915_2139.md`.
+
+**Signal AUCs over labeled rows with a screen:** rule_score 0.669 · **fit_prob 0.941** · blend **0.814**. The
+blend now scores *worse than fit alone* — `pipeline.combine`'s weights were set when fit was the weak signal.
+Re-tuning that split is the obvious next lever and was not touched here.
+
+### How it was wired (one training path, as specified)
+- `vw_label_set` gained a third branch reading `vw_llm_labels_latest`: **bullseye → label 1 weight 1.0 ·
+  adjacent → 1 / 0.6 · stretch → 0 / 0.5 · wrong → 0 / 1.0**, plus a `grade` column (NULL for other sources).
+- `vw_llm_labels_latest` now puts **`scorer = 'user-adjudicated'` first explicitly** (it previously won only by
+  accident of being newest, so any re-grade would have silently overwritten the user's call).
+- `SOURCE_PRIORITY` = `user_adjudicated` → `application` → `decision` → `jobs_found_escalated` → `llm_judge` →
+  `pseudo_neg`: the user's adjudication outranks everything, the vault outranks the judge.
+- `features.training_set` **drops every posting in `training_exclusions`** (35 rows) from *all* sources — that
+  removed 3 application and 2 escalated positives, which is the point of the table.
+- Graded rows are fuzzy-deduped against higher-priority vault rows but **never against each other** (§17.2: an
+  employer's boilerplate makes unrelated roles look alike, so collapsing them would throw labels away).
+- `labels.collect` keeps judged postings out of the pseudo-negative sample — a graded posting carries a real
+  label and must not be re-sampled as "unlabeled" at weight 0.5.
+
+**Training set: 4,787 rows — 876 positive / 3,911 negative.** application 288 · llm_judge 2,927 ·
+pseudo_neg 1,500 · jobs_found_escalated 66 · decision 3 · user_adjudicated 3.
+
+### One contested row left for the user
+**Capital One "Senior Manager Data Analytics - People Strategy & Analytics"** — a vault application (positive),
+graded `stretch` ("validating analytical tool methodologies and coaching junior data staff is a
+data-governance/analytics discipline"). Per handoff decision 4 the vault positive wins and it trains as a
+positive. If you would rather it were contested-and-excluded, that is
+`finder.py judge exclude --posting <id> --reason ...`. Angi and Zillow needed no action — their
+user-adjudicated `wrong` rows correctly beat their vault positives.
+
+## NEXT SESSION: START HERE
+1. **Re-tune `pipeline.combine`.** blend AUC 0.814 < fit AUC 0.941 means the blend is now *destroying* signal.
+   The weights assume a weak fit model that no longer exists. Highest value, smallest change — same shape as
+   this session's win.
+2. **Re-calibrate coverage** (`coverage --calibrate`): the 7-negative problem is gone, `vw_hard_negatives` can
+   now draw on 2,107 graded `wrong` rows. Then re-run the §15.7 eyeball and only then decide 3b.
+3. **The user still wants to eyeball ~100 labels** (`judge report --csv db/snapshots/llm_labels.csv`). The
+   rubric line about capacity/workforce-planning frameworks was fixed *after* the run, so `rubric_version` has
+   changed and any re-grade will differ from that night's.
+4. Grade a fresh reject sample under the new screen to measure the miss rate out-of-sample.
 
 ## Active Sprint
-@/docs/SPRINT_PLAN.md — **Phase 3a is BUILT (commit `ebcf40c`, local, not pushed) and its §15.7 eyeball FAILED. Do not start 3b or Phase 4.** Coverage is computed, stored and displayed at weight 0, exactly as §16.6 requires, and the gate it describes is what caught the problem: requirement coverage as specified does not separate fits from near misses on this corpus (details below). The next decision is a design one and belongs to the user with Fable: keep absolute cosine bands and change the inputs, or replace the band scheme with a contrast measure. Phases 1 and 2 are unchanged and live.
+@/docs/SPRINT_PLAN.md — §17.5 item 1 (retrain) is **DONE**; §17.7 acceptance boxes 4 and 6 are met. **Phase 3a
+is BUILT and its §15.7 eyeball FAILED; 3b and Phase 4 are still not started.** Coverage stays at weight 0. The
+3b decision is unchanged and still belongs to the user with Fable — the Phase 3a diagnosis below stands, except
+that its worst input (7 hard negatives) is now fixed and a re-calibration is worth running before deciding.
 
-## The live DB is current
-- **First live finder run, 2026-09-15 (the user ran it):** `labels --report` → `train --report` → `rescreen-all` → `sync`. Model **`ec851b252dc3`** (359 pos / 1,500 pseudo-neg, 5-fold AUC 0.983, precision@20 1.000, positives mean fit 0.80 held-out / 0.90 in-sample). Rescreen: **80,276 active rows in 526 s** under rules `a844b0d2d80d` — candidate 276 · review 1,708 · reject 78,292; bands very_strong 78 · strong 544 · partial 1,226 · weak 136. Tracker: 336 rows, 56 fuzzy, 0 exact, 48 decisions added.
-- **First live pipeline report:** the run chain had no `report` step, so Claude ran `finder.py report`: vault `Search_Results/Jobs_Found_20260915_1821.md` (15 blocks, 150 summary rows, snapshots refreshed). Auto-synced to the vault.
-- Top of that file: Henry Schein R134977 96 · Humana AVP Corp Dev Integration 95 · Amgen AVP AI&D 95 · M&T Sr Org Change Mgr 94 · CVS VP & COO Medical Affairs 93 · USAA HR Integration Principal 93 · Humana Portfolio Enablement Lead 93. The context misfires are still in the top 15 — the problem Phase 3 was built to solve.
-- **The live DB is still schema v3 and has no coverage data.** All Phase 3a work ran on `db/finder_scratch.duckdb` (copied from the live file at 18:21, after the report). The first live run with this code will add the coverage tables and bump it to v4 (additive only; `postings` untouched). `rules_version` is unchanged at `a844b0d2d80d`, so the live screens stay valid.
+## Known broken (pre-existing, not from this session)
+`tests/test_finder.py::test_rescreen_predicate_selects_only_new_changed_or_version_changed` fails on `main` at
+`3de36b4` as well — it expects one candidate and gets two. Almost certainly stale since the ingest-audit change
+that stamps `description_fetched_at` when text actually changes. **82 of 83 tests pass.**
 
 ## Phase 3a — what was built (commit `ebcf40c`)
 - `backend/finder/evidence.py` — TOML manifest (`evidence.local.toml`, gitignored; `JOBSEARCH_EVIDENCE` overrides), csv / markdown / pdf / html / text loaders, 40–600 char units, kind weights, per-source `skip_headings` / `skip_patterns`, guards loaded but never embedded, `evidence_units` with `FLOAT[384]` vectors.
