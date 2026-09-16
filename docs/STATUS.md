@@ -76,6 +76,61 @@ positive. If you would rather it were contested-and-excluded, that is
 `finder.py judge exclude --posting <id> --reason ...`. Angi and Zillow needed no action — their
 user-adjudicated `wrong` rows correctly beat their vault positives.
 
+## STOPPED BY THE USER at 890 of 2,973 re-graded — the rubric is VALIDATED, the rest is a decision
+
+**Nothing is running.** `judge status --dir db/batches_relabel2` → 24 done, **82 pending (2,046 postings,
+~5.9M tokens)**. Resume by grading `db/batches_relabel2/batch_025.md` onward, or re-export from scratch —
+`--relabel` is idempotent and queues only what still predates rubric `7958bdf42066`.
+
+**The corpus is now MIXED: 890 postings at the new rubric, 2,083 still at the old one.** Do not retrain or read
+a corpus-wide grade distribution until that is resolved one way or the other — `vw_llm_labels_latest` currently
+returns wrong 2,137 · stretch 407 · bullseye 251 · adjacent 214, which is two rubrics blended.
+
+### Validation result (clean proportional sample, n=575 — the 308 rows from the buggy first queue excluded)
+| old \ new | bullseye | adjacent | stretch | wrong | total | % good |
+|---|---|---|---|---|---|---|
+| **bullseye** | 31 | 11 | 2 | 1 | 45 | **93%** |
+| adjacent | 0 | 7 | 2 | 0 | 9 | 78% |
+| stretch | 5 | 26 | 23 | 13 | 67 | 46% |
+| **wrong** | 9 | 22 | 31 | 392 | 454 | 7% |
+
+**79% of grades unchanged.** good-fit 9.4% → 19.3%; wrong 79.0% → 70.6%. (`adjacent` is thin here because the
+buggy first queue consumed most of that pool; its row is not a reliable estimate.)
+
+Three checks, all passed:
+1. **Not permissive.** The rubric got *stricter* on the middle, not looser. The 55% good-fit rate seen mid-run
+   earlier was entirely the queue-ordering bug, not the rubric.
+2. **The primary lane was not crowded out** by the platform / AI-tooling additions — 3 of 45 bullseyes demoted,
+   one of them Voya "AI Security Architect" → `wrong`, which is correct.
+3. **The rationales cite the work, not the rubric.** This was the test for whether the judge had started
+   pattern-matching the instructions instead of reading the JD. Every recovered row names actual duties.
+
+**31 rows recovered from `wrong`, concentrated exactly where the gaps were named:** Capital One "Principal
+Associate, FP&A" → bullseye (the row that previously read *"corporate FP&A, a distinct finance discipline"*),
+Capital One "Director, Finance (FP&A) - Enterprise AI" → bullseye, USAA "Financial Analyst Senior" → bullseye,
+Amgen "Sr Associate Finance" → bullseye, **GM "Senior Process Transformation Business Intelligence"** → bullseye
+(*"builds Python/SQL data pipelines and LLM-powered business tools under a Process Transformation mandate"*).
+
+### The open decision: one lens or two (user's idea, 2026-09-15 night)
+Score every posting through **two** rubrics — a technical/data lens and a process/change-management lens —
+instead of compressing both into one grade. The argument is strong and the data supports it: that GM row is a
+bullseye on *both* lenses and is currently indistinguishable from a pure-process bullseye with the same score.
+"An Operator who codes" is the user's stated core identity and the system cannot currently see it. Two lenses
+also make the whole class of bug fixed tonight structurally impossible — the analytics cap existed only because
+one axis had to encode two different capabilities.
+
+**Design point that makes it affordable: ONE pass emitting TWO grades, not two passes.** The expensive part is
+reading the JD; a second grade off the same read should cost ~75-80k per batch rather than 140k.
+
+| option | cost | |
+|---|---|---|
+| A. Finish single-lens | ~5.9M | validated labels, retrain now; two-lens later costs ~9M more |
+| B. Switch to two-lens now | ~9M | re-grades all 2,973 with both grades, supersedes tonight's 890 |
+| **C. Finish single-lens, two-lens next sprint** | ~5.9M now | **recommended** — single-lens labels survive as an "overall" column rather than being discarded |
+
+Two-lens needs a real design pass first: schema (`grade_process` + `grade_technical`, or a `lens` column —
+the `llm_labels` PK has room), how two grades produce one rank, and report changes. It should not be improvised.
+
 ## IN FLIGHT: the full re-grade under the corrected rubric — RESUMABLE, just continue
 
 **ACTIVE DIRECTORY IS `db/batches_relabel2/` — 106 batches, 2,646 postings, rubric `7958bdf42066`.**
