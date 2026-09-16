@@ -1,182 +1,64 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-15 night (Claude Code / Opus on Vostro; the fit model retrained on the graded labels). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-16 ~00:50 (Claude Code / Opus on Vostro, overnight with a second terminal on a Pro account). Overwrite at the end of each session; git history is the changelog._
 
-## DONE THIS SESSION: the fit model is retrained on the 3,009 graded labels (§17.5 item 1)
-**It worked.** The graded `wrong` / `stretch` rows are now the model's negatives, and the failure the whole
-labeling run was built to fix — a vocabulary model that could not tell a bullseye from a senior generalist
-sharing its words — is gone. Model **`330a4e0ce441`** replaces `ec851b252dc3`.
+## DONE: the corpus is fully re-graded on two lenses, the model is retrained, the screen is current
 
-### The number that was never measurable before
-**AUC of positives vs the graded `wrong` rows: 0.946** (vs `stretch` 0.776; using only graded positives, so both
-sides come from the same corpus and the same judge: 0.941 / 0.739). Before this session the only negatives were
-1,500 random postings, so no such AUC existed.
+**2,973 postings, 118 batches, 0 rejected on import, one rubric version (`897123f3fc93`).** Two terminals ran it in parallel from opposite ends of the queue (`docs/OVERNIGHT.md`); they met in the middle with no collision. Model **`efc5c78495a7`**, rules `2f74427157f8`, report `Search_Results/Jobs_Found_20260916_0045.md`.
 
-**Held-out (out-of-fold) fit by grade — the honest separation:** bullseye **0.75** · adjacent **0.62** ·
-stretch **0.46** · wrong **0.19**. The old model's *final scores* by grade were 82.0 / 80.0 / 79.8 / 72.8 — it
-told `wrong` from the rest by ~8 points and told the other three apart not at all. That is now a clean gradient.
+### The labels
+| lens | bullseye | adjacent | stretch | wrong |
+|---|---|---|---|---|
+| process | 382 | 649 | 195 | 1,744 |
+| technical | 224 | 436 | 333 | 1,977 |
 
-5-fold AUC **0.947** (was 0.983) and precision@20 **0.990** (was 1.000). **Both falling is the expected and
-correct result**: the old figures were measured against random postings, which any vocabulary model wins. The
-task is now genuinely hard, and 0.947 is against real near misses.
+Lens buckets over the whole corpus (`both` = at least one bullseye): process-only **778** · technical-only **301** · **both 253** · neither 1,638.
 
-### Acceptance checks from the handoff
-| Check | Before | After | |
-|---|---|---|---|
-| **Amentum "Business Process Specialist (Mid-Level)"** (graded bullseye, killed by the content gate) | fit **0.12**, rejected | fit **0.744**, score 74, `review`/strong | ✅ **the stated pass/fail test** |
-| Henry Schein R134977 (the bullseye) | 96 | **97**, fit 0.992, very_strong | ✅ |
-| Capital One "AI Foundations" misfires | ~95, top 15 | **0.026 / 0.044 fit, rejected** | ✅ |
-| Centene "Senior Director, Medical Economics" (graded stretch) | 93, within 4 pts of the bullseye | 90, **7 points below** | ⚠️ closer than wanted but ordered correctly |
-| Humana "Creative Operations Director" (graded stretch) | in the top 15 | 86, 11 points below | ⚠️ same |
-| Booz Allen "Digital Transformation Specialist" (content-gate false negative) | 0.34, rejected | fit 0.669, score 67, `review` | ✅ |
-| Included Health "Director, Staffing Transformation & Ops" (bullseye) | — | 94, fit 0.901, candidate | ✅ |
+**255 roles recovered from the old `wrong` pool** (60 → bullseye, 195 → adjacent), and **no old bullseye fell to wrong**. That recovery is the entire justification for re-grading everything instead of sampling, and it is concentrated exactly where the old rubric was blind: FP&A, workforce/capacity analytics, and hybrid process+BI roles.
 
-**Band × grade crosstab, good-fit rate** (good = bullseye + adjacent): very_strong **53% → 92%** · strong
-**38% → 78%** · partial **20% → 33%** · weak **14% → 0%**. Still monotonic, and far steeper.
-
-**Level 1 miss rate:** of every graded posting now rejected, 35 bullseye + 53 adjacent out of 2,252 = **3.9%**,
-down from the ~13% measured on the 599-row reject sample. Different denominator, so treat it as directional
-until a fresh reject sample is graded.
-
-> **Read the crosstab and the miss rate as in-sample.** The model was trained on these labels, so those two
-> tables flatter it. The out-of-fold figures above (AUC 0.946, fit-by-grade 0.75/0.62/0.46/0.19) are the honest
-> ones, and they are what the verdict rests on.
-
-**Rescreen `330a4e0ce441`:** 80,272 rows in 452 s under rules `a844b0d2d80d` — candidate **130** (was 276),
-review **819** (was 1,708), reject 79,323. Bands very_strong 123 · strong 358 · partial 403 · weak 65. The
-screen got much tighter because the model finally disagrees with senior-generalist vocabulary. Report written:
-vault `Search_Results/Jobs_Found_20260915_2139.md`.
-
-**Signal AUCs over labeled rows with a screen:** rule_score 0.669 · **fit_prob 0.941** · blend **0.814**. The
-blend now scores *worse than fit alone* — `pipeline.combine`'s weights were set when fit was the weak signal.
-Re-tuning that split is the obvious next lever and was not touched here.
-
-### How it was wired (one training path, as specified)
-- `vw_label_set` gained a third branch reading `vw_llm_labels_latest`: **bullseye → label 1 weight 1.0 ·
-  adjacent → 1 / 0.6 · stretch → 0 / 0.5 · wrong → 0 / 1.0**, plus a `grade` column (NULL for other sources).
-- `vw_llm_labels_latest` now puts **`scorer = 'user-adjudicated'` first explicitly** (it previously won only by
-  accident of being newest, so any re-grade would have silently overwritten the user's call).
-- `SOURCE_PRIORITY` = `user_adjudicated` → `application` → `decision` → `jobs_found_escalated` → `llm_judge` →
-  `pseudo_neg`: the user's adjudication outranks everything, the vault outranks the judge.
-- `features.training_set` **drops every posting in `training_exclusions`** (35 rows) from *all* sources — that
-  removed 3 application and 2 escalated positives, which is the point of the table.
-- Graded rows are fuzzy-deduped against higher-priority vault rows but **never against each other** (§17.2: an
-  employer's boilerplate makes unrelated roles look alike, so collapsing them would throw labels away).
-- `labels.collect` keeps judged postings out of the pseudo-negative sample — a graded posting carries a real
-  label and must not be re-sampled as "unlabeled" at weight 0.5.
-
-**Training set: 4,787 rows — 876 positive / 3,911 negative.** application 288 · llm_judge 2,927 ·
-pseudo_neg 1,500 · jobs_found_escalated 66 · decision 3 · user_adjudicated 3.
-
-### One contested row left for the user
-**Capital One "Senior Manager Data Analytics - People Strategy & Analytics"** — a vault application (positive),
-graded `stretch` ("validating analytical tool methodologies and coaching junior data staff is a
-data-governance/analytics discipline"). Per handoff decision 4 the vault positive wins and it trains as a
-positive. If you would rather it were contested-and-excluded, that is
-`finder.py judge exclude --posting <id> --reason ...`. Angi and Zillow needed no action — their
-user-adjudicated `wrong` rows correctly beat their vault positives.
-
-## STOPPED BY THE USER at 890 of 2,973 re-graded — the rubric is VALIDATED, the rest is a decision
-
-**Nothing is running.** `judge status --dir db/batches_relabel2` → 24 done, **82 pending (2,046 postings,
-~5.9M tokens)**. Resume by grading `db/batches_relabel2/batch_025.md` onward, or re-export from scratch —
-`--relabel` is idempotent and queues only what still predates rubric `7958bdf42066`.
-
-**The corpus is now MIXED: 890 postings at the new rubric, 2,083 still at the old one.** Do not retrain or read
-a corpus-wide grade distribution until that is resolved one way or the other — `vw_llm_labels_latest` currently
-returns wrong 2,137 · stretch 407 · bullseye 251 · adjacent 214, which is two rubrics blended.
-
-### Validation result (clean proportional sample, n=575 — the 308 rows from the buggy first queue excluded)
-| old \ new | bullseye | adjacent | stretch | wrong | total | % good |
-|---|---|---|---|---|---|---|
-| **bullseye** | 31 | 11 | 2 | 1 | 45 | **93%** |
-| adjacent | 0 | 7 | 2 | 0 | 9 | 78% |
-| stretch | 5 | 26 | 23 | 13 | 67 | 46% |
-| **wrong** | 9 | 22 | 31 | 392 | 454 | 7% |
-
-**79% of grades unchanged.** good-fit 9.4% → 19.3%; wrong 79.0% → 70.6%. (`adjacent` is thin here because the
-buggy first queue consumed most of that pool; its row is not a reliable estimate.)
-
-Three checks, all passed:
-1. **Not permissive.** The rubric got *stricter* on the middle, not looser. The 55% good-fit rate seen mid-run
-   earlier was entirely the queue-ordering bug, not the rubric.
-2. **The primary lane was not crowded out** by the platform / AI-tooling additions — 3 of 45 bullseyes demoted,
-   one of them Voya "AI Security Architect" → `wrong`, which is correct.
-3. **The rationales cite the work, not the rubric.** This was the test for whether the judge had started
-   pattern-matching the instructions instead of reading the JD. Every recovered row names actual duties.
-
-**31 rows recovered from `wrong`, concentrated exactly where the gaps were named:** Capital One "Principal
-Associate, FP&A" → bullseye (the row that previously read *"corporate FP&A, a distinct finance discipline"*),
-Capital One "Director, Finance (FP&A) - Enterprise AI" → bullseye, USAA "Financial Analyst Senior" → bullseye,
-Amgen "Sr Associate Finance" → bullseye, **GM "Senior Process Transformation Business Intelligence"** → bullseye
-(*"builds Python/SQL data pipelines and LLM-powered business tools under a Process Transformation mandate"*).
-
-### The open decision: one lens or two (user's idea, 2026-09-15 night)
-Score every posting through **two** rubrics — a technical/data lens and a process/change-management lens —
-instead of compressing both into one grade. The argument is strong and the data supports it: that GM row is a
-bullseye on *both* lenses and is currently indistinguishable from a pure-process bullseye with the same score.
-"An Operator who codes" is the user's stated core identity and the system cannot currently see it. Two lenses
-also make the whole class of bug fixed tonight structurally impossible — the analytics cap existed only because
-one axis had to encode two different capabilities.
-
-**Design point that makes it affordable: ONE pass emitting TWO grades, not two passes.** The expensive part is
-reading the JD; a second grade off the same read should cost ~75-80k per batch rather than 140k.
-
-| option | cost | |
+### The retrained model
+| | single-lens (`330a4e0ce441`) | two-lens (`efc5c78495a7`) |
 |---|---|---|
-| A. Finish single-lens | ~5.9M | validated labels, retrain now; two-lens later costs ~9M more |
-| B. Switch to two-lens now | ~9M | re-grades all 2,973 with both grades, supersedes tonight's 890 |
-| **C. Finish single-lens, two-lens next sprint** | ~5.9M now | **recommended** — single-lens labels survive as an "overall" column rather than being discarded |
+| AUC positives vs graded `wrong` | 0.946 | **0.973** |
+| AUC vs `stretch` | 0.776 | **0.836** |
+| held-out fit by grade | 0.75 / 0.62 / 0.46 / 0.19 | **0.77 / 0.68 / 0.43 / 0.15** |
 
-Two-lens needs a real design pass first: schema (`grade_process` + `grade_technical`, or a `lens` column —
-the `llm_labels` PK has room), how two grades produce one rank, and report changes. It should not be improvised.
+Top positive terms now lead with `finance`, then change management, analytics, process improvement, transformation, governance, dashboards, ai, forecasting, adoption, workforce. `finance` leading is new and is the FP&A recovery showing up in the weights.
 
-## IN FLIGHT: the full re-grade under the corrected rubric — RESUMABLE, just continue
+**Rescreen:** 80,272 rows in 540 s — candidate 130 → **228**, review 819 → **1,118**, reject 79,323 → 78,926. 397 more postings now survive Level 1, because the model no longer discards analytics and finance work as noise.
 
-**ACTIVE DIRECTORY IS `db/batches_relabel2/` — 106 batches, 2,646 postings, rubric `7958bdf42066`.**
-`db/batches_relabel/` is the first 12 batches, all graded and imported; leave it alone. 308 of 2,973 done. Every batch result is written the moment that batch finishes,
-so stopping anywhere costs at most one batch. The user's 5-hour session token budget will likely run out
-mid-run; his weekly budget refreshes 8 AM.
+### The result that validates the whole design
+Survivors by score band and lens bucket:
 
-```bash
-cd /home/bensonjt/code/jobsearch                       # = /mnt/e/code/jobsearch
-.venv/bin/python finder.py judge status --dir db/batches_relabel2        # where did we stop
-# grade the pending batches: one Claude Code subagent per batch, 6-8 in parallel, Sonnet. Prompt:
-#   read db/batches_relabel2/batch_NNN.md, grade every posting, write db/batches_relabel2/batch_NNN.result.json
-#   as a JSON array of {posting_id, grade, lane, confidence, blocker, rationale}; reply with ONLY the count
-#   and the grade tally.
-.venv/bin/python finder.py judge import --dir db/batches_relabel2 --scorer claude-sonnet-batch   # safe to re-run
-```
+| band | both | process | technical | neither |
+|---|---|---|---|---|
+| very_strong | **125** | 97 | 24 | **0** |
+| strong | 78 | 188 | 79 | 9 |
+| partial | 13 | 142 | 83 | 45 |
+| weak | **0** | 73 | 17 | **68** |
 
-**Why the whole corpus and not the cheap 600 (user's call, and he is right):** the analytics cap pushed roles
-into `wrong`, not only into `stretch`, so the 2,111 `wrong` rows are exactly where recovered fits will be found.
-A stratified sample would have measured the migration matrix but not recovered the rows.
+**Half the very_strong band is dual-lens and not one `neither` reaches it; the weak band is the exact inverse.** The fit model trains on the AVERAGED grade and never sees the lens split, so this agreement is independent evidence that both the lenses and the score are measuring something real.
 
-**`--relabel` is now idempotent** — it queues only postings whose newest label predates the current
-`rubric_version`, so re-running `judge export --relabel --batch-size 25 --dir <new dir>` after any stopping
-point produces exactly what is left. That is the resume path if the batch directory is ever lost.
+**Survivors available for the three report lists: process 501 · both 216 · technical 203.**
 
-**Ordering bug found and fixed mid-run (commit below).** The first relabel queue concatenated the grades
-alphabetically, so batches 1-12 were 100% old-`adjacent` rows and the running tally read as a threefold jump in
-the good-fit rate. Those 308 labels are valid, just not a representative sample. `_spread()` now interleaves
-each grade proportionally, so any stopping point spans the corpus (section 17.2). **Do not read a mid-run tally
-from `db/batches_relabel/` as a corpus estimate.**
+### Bug found and fixed: `model_version` hashed label IDs only
+Re-grading changed every grade but not a single `label_id`, so the first retrain produced a materially better model under an **identical version string**. `rescreen` re-screens a row only when `model_version` differs — it would have skipped all 80k rows and silently left every score on the old model, with no error anywhere. Caught because the metrics moved while the hash did not. Now hashed over `(label_id, label, weight)`, regression test added. **86 passing.**
 
-**When the grading finishes, in this order:**
-```bash
-.venv/bin/python finder.py judge import --dir db/batches_relabel2 --scorer claude-sonnet-batch
-.venv/bin/python finder.py judge report --csv db/snapshots/llm_labels.csv    # agreement + the CSV to eyeball
-.venv/bin/python finder.py labels --report && .venv/bin/python finder.py train --report
-.venv/bin/python finder.py rescreen-all && .venv/bin/python finder.py sync && .venv/bin/python finder.py report
-```
+### Agreement with the user's own behaviour
+Of the postings he pursued: 17 bullseye · 9 adjacent · 7 stretch · 3 wrong. 72% agreement, unchanged in character from the single-lens run. The 10 contested rows are in `db/snapshots/llm_labels.csv` with `grade_process`, `grade_technical` and `favoured_lens` columns.
 
-**What to measure and compare against this file's numbers:** the grade distribution vs the old
-bullseye 208 / adjacent 349 / stretch 338 / wrong 2,114; **the migration matrix (old grade x new grade) — the
-whole point, especially `wrong` -> bullseye/adjacent**; OOF fit by grade among SURVIVORS, which was the flat
-bullseye 0.77 / adjacent 0.64 / stretch 0.65 / wrong 0.63; and whether 5-fold AUC and AUC-vs-`wrong` move.
+## NEXT SESSION: START HERE
+1. **Build the three report lists** — strong process, strong technical, and `both`. `vw_lens_grades.lens_bucket` already computes them; `report.py` does not use it yet. This is the user's stated decision surface: he positions each application as process, technical, or both.
+2. **A fit model per lens** (sprint plan §18.8). The single TF-IDF model is the last place the one-axis design survives; `fit_process` and `fit_technical` are what ranking *within* each list needs.
+3. **Re-tune `pipeline.combine`** — content is at 0.90 from the 2026-09-15 sweep, but a two-lens content score may want its own blend.
+4. **Two both-list rows to eyeball as probable over-grades:** Airbnb "Senior Systems Engineer, BizTech" and Booz Allen "ICAM Operations Accelerator" — both look like engineering seats that slipped the platform-engineering exclusion.
+5. **Re-calibrate coverage** (`coverage --calibrate`); `vw_hard_negatives` can now draw on 1,361 graded `wrong` rows instead of 7 audited ones. Then re-run the §15.7 eyeball and decide 3b.
+6. The user still wants to eyeball ~100 labels from the CSV.
 
-**New labels do not collide with old ones** — `llm_labels` PK includes `rubric_version`, and
-`vw_llm_labels_latest` takes user-adjudicated first, then newest, so the new grades win automatically.
+## Housekeeping
+- `./progress.sh` reports where a batch run stopped; result files are the only source of truth.
+- `rubric_local.py` is gitignored; its backup is vault `Tools/Finder_Build_Personal_Appendix.md` §2, synced at `897123f3fc93` and pushed. **Re-sync it whenever the rubric changes.**
+- Local commits are unpushed in this repo; the user pushes.
 
 ## Also done: the blend re-tuned to content 0.90, and the rubric's analytics cap removed
 
