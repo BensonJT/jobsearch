@@ -42,6 +42,27 @@ _Last updated: 2026-09-15 evening (Claude Code / Opus on Vostro; Phase 3a built 
 5. **What does work:** the source-invariance fix (0.14-point paired gap), specificity (boilerplate down to 0.26), the evidence pipeline (matches are dominated by `resume_bullets` and `soar_stories`, the achievement-kind sources, exactly as intended), and the unit cache (warm re-cover 132 s).
 6. **Symptom worth seeing:** ranking survivors by `coverage_required` puts GitLab "Staff Backend Engineer" (77.0), Guidehouse "Data Platform Lead" (73.0) and "Adobe Commerce Sr. Solutions Architect" (63.7) on top — short, terse requirement lists with few units, where noise dominates.
 
+## Live run 2026-09-15 20:11 — coverage on the live DB, second report written
+- **A WSL crash at 19:42 killed the first attempt** mid-coverage (evidence stage had finished at 19:39:59). Nothing
+  was lost or corrupted: `requirement_units` commits per 200-posting batch, so 17,038 units survived and the plain
+  rerun resumed. **Coverage is crash-resumable; just rerun `finder.py coverage && finder.py report`.**
+- Live totals: evidence 2,888 units (version `74156dda6991`, 4 min) · coverage **1,983 postings in 870 s** (partly
+  warm) · report written at 20:11:47 → vault `Search_Results/Jobs_Found_20260915_2011.md`.
+- **Comparison with the 18:21 report** (both pipeline files, 150 summary rows each): the summary tables are
+  **identical — 150 rows in both, none added, none dropped**, confirming §16.6 held (coverage at weight 0 changed no
+  score). **Zero block overlap**: the 14-day `surfaced` rule pushed the blocks to ranks 16–30, so the two files
+  together give 30 escalated JDs rather than the same 15 twice. The new file's Fit stanzas carry the coverage fields.
+- **New finding from reading those stanzas — company boilerplate is being scored as requirements.** Reported gaps
+  include "Strong interest in Angi, home services, marketplaces…", "To learn more about the culture, rewards and
+  benefits…", "San Antonio, TX, Charlotte, NC, Tampa, FL or Phoenix, AZ.", "At Caylent, our people always come
+  first.", "Disability and life insurance". These are intro / benefits / location text that `split_requirements`
+  admitted into the required and role groups, where they can never match evidence and drag every JD toward the same
+  middling score. That is a second, independent cause of the flat ~50 distribution, and it is fixable without
+  touching the encoder: tighten `DROP_HEADINGS` / intro handling and drop units that are marketing or benefits text.
+  The `not_in_record` tagging works correctly in the same stanzas ("… (e.g., PMP, CIPS) is a plus. [not_in_record: pmp]").
+- **Logging note:** Python block-buffers stdout through a pipe, so these run chains look silent until they finish.
+  Use `python -u` in future background chains.
+
 ## Option A was prototyped and also fails (2026-09-15, scratch DB, read-only)
 Contrast scoring — score each requirement by how far its best evidence cosine stands above that requirement's own
 baseline against the whole evidence store — was measured on the stored vectors (no re-embedding). Variants: `gap`
