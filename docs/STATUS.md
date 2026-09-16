@@ -18,7 +18,8 @@ sweep will NOT propagate that -- see "the rescreen trap" below.
 | `ff691c7` | A fit model per lens (18.8) |
 | `3ac4b51` | `board_facets` discovery; clamp detector corrected to a single-valued facet |
 | `740c9a7` | Clearance is a blocker only when it must already be HELD |
-| (uncommitted) | plan executor + facet key fix + live scope verification |
+| `01301c1` | Plan executor + facet key fix + live scope verification |
+| `a797478` | Domain tenure: a disjunctive list naming a field he has is not a gate |
 
 ## NEXT SESSION: START HERE
 1. **`rescreen-all`** -- the clearance fix reaches nothing until this runs. Expect ~6,000 postings to
@@ -37,7 +38,12 @@ sweep will NOT propagate that -- see "the rescreen trap" below.
 5. **VACUUM / defrag** -- the user asked for this; 22,660 postings and 82,734 screen rows were
    deleted today and the file is still ~1.36 GB.
 6. **Pending user decision:** record a `user-adjudicated` label on Guidehouse "Senior Business
-   Analyst" (see "judge variance" below). He ruled `adjacent`, not bullseye.
+   Analyst" (see "judge variance" below). He ruled `adjacent`, not bullseye. **He is building an
+   adjudication file of his own -- wait for it before touching adjudication.**
+7. **Proposed, not built: a "rules reject but model confident" review queue.** Three rules bugs were
+   found today *only* because the user checked reqs by hand. The Bausch + Lomb Director below is
+   `reject` by rules and 0.99+ on both lens models, and that contradiction is currently discarded
+   silently. Surfacing it is better than loosening rules that are right 7 times in 8.
 
 ## The rescreen trap (established 2026-09-16, worth not re-learning)
 `sweep.run` calls `pipeline.daily(since=stats["started"])`, and `_candidate_sql` ANDs that on top of
@@ -188,6 +194,45 @@ agentic AI-assisted development -- and none of it is in the evidence the judge r
 
 Also: duplicate reqs are stored as separate postings, which inflates the corpus and splits their
 grades. Deduping near-identical JDs per employer is a small separate win.
+
+## Three rules bugs, all found by the user checking reqs by hand
+1. **Clearance** (fixed, `740c9a7`) -- ~6,000 postings mis-flagged. See above.
+2. **Domain tenure** (fixed, `a797478`) -- "10+ years in Supply Chain, Operations, Logistics,
+   Manufacturing, Consulting, or a related field" gates on none of them; the rule read the first
+   term and raised a gate. 193 of 1,194 flagged postings (16%) are this disjunctive shape. A real
+   disjunction (comma series or explicit "or") plus a `CANDIDATE_TENURE_FIELDS` match now clears it;
+   "10+ years in banking operations" is a compound domain and still gates.
+3. **Not fixed, deliberately:** `off-function title` (TITLE_FUNCTION_TERMS has process/operational/
+   business excellence but not bare "excellence") and `sales/revenue ops scope (opportunity
+   pipeline)` (a CI *transformation* opportunity pipeline, not a sales pipeline). Both rejected the
+   Bausch Director. **Checked and left alone:** all 5 active "excellence"-titled postings hitting
+   the first are genuinely off-lane (Sales Excellence Manager x3), and 7 of 8 hitting the second are
+   genuinely sales/BD. Loosening either costs more than it buys -- the review queue is the fix.
+
+## SuccessFactors IS ingestible (new platform, adapter not built)
+Bausch + Lomb. The generic host `career2.successfactors.eu` does **not** paginate -- `startrow` is
+ignored, there is no `_s.crb` token to borrow, and Imperva/Incapsula cookies are present. The
+**branded** host does: `https://careers.bauschlomb.com/search/?q=&sortColumn=referencedate&sortDirection=desc&startrow=N`
+returned rows 26-50 correctly and pulled **172 of 173** reqs. Detail pages work via the
+`/job/<slug>/<id>/` path on the branded host (the generic host needs
+`career?company=X&career_ns=job_listing&career_job_req_id=<id>`).
+
+So the rule for SuccessFactors is: **find the employer's branded career host, not the generic one.**
+Worth checking how many target employers sit on SuccessFactors before building the adapter --
+it is common in pharma and medical device.
+
+## Two Bausch + Lomb reqs scored by hand (not in the corpus -- no SF adapter yet)
+| | Director, SC Strategy & Excellence (1369185957) | Principal SC Data Engineer & Analytics Lead (1369446357) |
+|---|---|---|
+| comp | **above the anchor** (see the vault; figures stay out of this public repo) | below it |
+| process / technical fit | **0.994 / 0.995** | 0.936 / 0.999 |
+| rule_score / verdict | 93 / `reject` | 90 / `review` |
+| level detected | senior (10 yrs) | mid (5 yrs) |
+| blockers | **travel up to 50% vs his 25% ceiling** | Power BI / Tableau / Qlik required, none in the record |
+
+The Director is the better role on every axis except travel, which the user confirmed is a genuine
+problem. The suggested screen question is what the steady state looks like after the initial network
+assessment, rather than negotiating the posted number.
 
 ## Carried over
 - SmartRecruiters / Workable JD backfill; daily schedule; long-tail adapters (iCIMS, Dayforce,
