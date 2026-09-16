@@ -2,6 +2,45 @@
 
 _Last updated: 2026-09-15 evening (Claude Code / Opus on Vostro; Phase 3a built and measured). Overwrite at the end of each session; git history is the changelog._
 
+## NEXT SESSION: START HERE — retrain the fit model on the new labels
+Everything needed is on disk; this file plus `docs/SPRINT_PLAN.md` §17 is the whole handoff.
+
+**The goal in one sentence:** the fit model's negatives are 1,500 random postings, which is why it cannot tell a
+bullseye from a senior generalist that shares its vocabulary. There are now **3,009 graded labels** — use the
+`wrong` and `stretch` rows from the confusable band as the hard negatives it has never had.
+
+**Design decisions already made (do not relitigate):**
+1. Grade → label: `bullseye` = positive 1.0, `adjacent` = positive 0.6, `stretch` = negative 0.5, `wrong` =
+   negative 1.0. Graded labels are richer than binary; weight them rather than throwing the middle away.
+2. **Skip every posting in `training_exclusions`** (35 rows: unjudgeable text, plus rows the user retired).
+3. **`scorer = 'user-adjudicated'` rows win** over the Sonnet grade for the same posting — that is how the user's
+   review is recorded (Fannie Mae → bullseye; Angi and Zillow → wrong, beating the fact that he applied).
+4. Vault application positives stay positive (§13) **unless** a user-adjudicated row says otherwise.
+5. Wire it through `vw_label_set` / `features.training_set`, not a second training path.
+
+**What to measure and report (the whole point):**
+- 5-fold AUC as before, plus **AUC of positives vs the graded `wrong` rows** — the number that was never
+  measurable before.
+- Where the named misfires land against the bullseye: CVS "VP & COO, Medical Affairs", Centene "Senior Director,
+  Medical Economics", Novartis "Director, AI Foundations Engineer" versus Henry Schein R134977. Today all four
+  sit within ~4 points.
+- **Amentum "Business Process Specialist" currently scores fit 0.12 and is a graded bullseye.** If that number
+  does not move, the retrain did not work.
+- Re-run the band crosstab (good-fit rate by band was 53 / 38 / 20 / 14) and the Level 1 miss rate (~13%).
+
+**Then, in order:** re-calibrate coverage against the real hard negatives (`coverage --calibrate` — the 7-negative
+problem is gone), re-run the §15.7 eyeball, and only then decide 3b. Phase 3b stays off until coverage ranks.
+
+```bash
+cd /mnt/e/code/jobsearch
+.venv/bin/python finder.py judge report --csv db/snapshots/llm_labels.csv   # the 3,009 labels, for eyeballing
+.venv/bin/python finder.py labels --report && .venv/bin/python finder.py train --report
+.venv/bin/python finder.py rescreen-all && .venv/bin/python finder.py report   # report is always last
+```
+
+**Also open:** the user still wants to eyeball ~100 labels; the rubric line about capacity/workforce-planning
+frameworks was fixed after the run, so `rubric_version` has changed and any re-grade will differ from tonight's.
+
 ## Active Sprint
 @/docs/SPRINT_PLAN.md — **Phase 3a is BUILT (commit `ebcf40c`, local, not pushed) and its §15.7 eyeball FAILED. Do not start 3b or Phase 4.** Coverage is computed, stored and displayed at weight 0, exactly as §16.6 requires, and the gate it describes is what caught the problem: requirement coverage as specified does not separate fits from near misses on this corpus (details below). The next decision is a design one and belongs to the user with Fable: keep absolute cosine bands and change the inputs, or replace the band scheme with a contrast measure. Phases 1 and 2 are unchanged and live.
 
