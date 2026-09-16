@@ -27,7 +27,25 @@ produced a result, so that condition is still open.
 2,065 coverage rows; both lens models (`tfidf_lr_process`, `tfidf_lr_technical`). Commit `9ab7755` (the leaked
 comp figure) is confirmed OFF the remote — the force-push listed below already happened.
 
+**ROOT CAUSE, found on the third attempt (15:21 EDT): the Python environment lives on `/mnt/e`.** A single-threaded,
+native-DB retry died at IMPORT with `OSError: [Errno 12] Cannot allocate memory` opening an ordinary `.py` file inside
+`.venv/.../transformers/models/` — while Linux had **5,868 MB available**. `/mnt/e` is a 9p mount served by a process
+on the WINDOWS side; when Windows is under memory pressure (the user had several apps open), that server fails
+requests — ENOMEM on `open()`, SIGBUS on memory-mapped reads. `transformers` walks hundreds of model files at import
+and `torch` memory-maps large libraries, so heavy ML imports are exactly the load that trips it. That one mechanism
+explains all three failures: the 14:20 bus error (mmap over 9p, 4 GB free in Linux), the WSL crash (two heavy torch
+jobs importing over 9p at once), and this ENOMEM. **Moving only the DB to native ext4 was not enough — the packages
+were still on 9p.** The memory watchdog did not fire because it watched Linux memory, which stayed healthy; the
+pressure was on the Windows side of the mount.
+
+**The durable fix (recommended, not yet done):** a second venv on native ext4, e.g. `~/jobsearch_native/venv`, used
+for heavy ML jobs (coverage, calibration, embeddings); code and DB stay where they are. Needs a quiet machine to
+install (CPU torch + sentence-transformers, ~10-15 min). Until then, retrying only works if Windows has headroom.
+
 **SAFE RETRY — follow exactly. One process. Nothing else running. Native filesystem. Single-threaded.**
+(Check for a running job with `pgrep -af '[f]inder\.py'` in a command of its own: any other occurrence of the literal
+text finder.py in the same command makes pgrep match its own shell. And run from the native venv once it exists —
+the launcher at `~/jobsearch_native/run_calibration.sh` still points at `/mnt/e/code/jobsearch/.venv`.)
 ```bash
 pgrep -af "finder.py" && echo "STOP: something is already running"      # must print nothing
 cp /mnt/e/code/jobsearch/db/jobsearch.duckdb ~/jobsearch_native/jobsearch.duckdb   # refresh the native copy first
