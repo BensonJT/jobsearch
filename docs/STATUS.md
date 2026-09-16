@@ -42,6 +42,35 @@ _Last updated: 2026-09-15 evening (Claude Code / Opus on Vostro; Phase 3a built 
 5. **What does work:** the source-invariance fix (0.14-point paired gap), specificity (boilerplate down to 0.26), the evidence pipeline (matches are dominated by `resume_bullets` and `soar_stories`, the achievement-kind sources, exactly as intended), and the unit cache (warm re-cover 132 s).
 6. **Symptom worth seeing:** ranking survivors by `coverage_required` puts GitLab "Staff Backend Engineer" (77.0), Guidehouse "Data Platform Lead" (73.0) and "Adobe Commerce Sr. Solutions Architect" (63.7) on top — short, terse requirement lists with few units, where noise dominates.
 
+## Ingest audit, prompted by a JD the user pasted (2026-09-15 late)
+The user pasted the AHEAD JD he had applied to and asked whether we held that detail. **We did not.** That one
+question found a platform-wide ingest bug and cleared a second platform.
+
+- **Lever was storing the wrapper, not the job.** `lever_jobs` read `description` (opening blurb) and `additional`
+  (EEO, benefits) and never `lists`, where Lever keeps every duty, requirement and skill section. 506 postings at
+  6 employers — AHEAD, Included Health, Aledade, Aprio, FiscalNote, Life.Church — were scored on boilerplate.
+  AHEAD's posting went **2,756 → 5,826 chars**; the platform median went **3,297 → 5,808**. Fixed, tested,
+  re-swept (no delete needed: the upsert refreshed text in place and kept `first_seen_at` and lifecycle).
+- **Re-screening the 502 corrected rows: 4 very_strong · 38 strong · 19 candidate · 66 review** — ~85 postings
+  that were invisible an hour earlier. Re-graded by Sonnet (21 batches): **9 bullseye, 15 adjacent**, including
+  **Included Health "Director, Staffing Transformation & Operations" (bullseye, score 93)** and Included Health
+  "Workforce Analytics Model Standardization Consultant" (bullseye, 79) — the user's own GNO capacity work.
+- **A second, quieter bug on the way:** the upsert refreshed `description_text` without touching
+  `description_fetched_at`, so the finder never re-screened text an ingest fix had rewritten. Now stamped when the
+  text actually changes — **in UTC**, because the finder writes `screened_at` in UTC while DuckDB's `now()` is
+  local, and a local stamp read as hours in the past would have silently disabled every future re-screen.
+- **Oracle ORC audited and cleared.** Its lower median (3,304 vs Workday's 6,197) is employer mix, not a dropped
+  field: the adapter already reads `ExternalDescriptionStr` + `ExternalResponsibilitiesStr` +
+  `ExternalQualificationsStr`. Verified against the live API on the user's NFCU "Principal Business Analyst":
+  Qualifications 3,302 and Responsibilities 2,019 chars are both present in our 5,056 stored characters. The
+  fields we skip are correctly skipped (`CorporateDescriptionStr` is the company blurb, `ShortDescriptionStr` a
+  teaser, `Internal*` byte-identical duplicates). **One refinement made:** Oracle returns those sections
+  unlabelled, so the splitter could not tell the role section from the person section — the detail fetch now
+  writes `Responsibilities` / `Qualifications` headings as it joins them (applies to newly fetched rows).
+- **Near-miss worth remembering:** `db/batches_rejects/` was not gitignored and 25 JD batch files were briefly
+  tracked; the pre-commit personal-pattern scan caught it and they were dropped from the tip commit before any
+  push. `.gitignore` now covers `db/batches*/`.
+
 ## The labeling run (sprint plan §17) — 2,573 graded labels, 2026-09-15 night
 **Done:** every screen survivor (1,940 postings in 78 batches) plus a deliberate 599-posting reject sample, graded
 by Claude Sonnet subagents against `rubric.RUBRIC_PUBLIC` + `RUBRIC_PERSONAL`. **0 rows rejected on import.**
