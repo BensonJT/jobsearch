@@ -1,373 +1,206 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-16 ~00:50 (Claude Code / Opus on Vostro, overnight with a second terminal on a Pro account). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-16 (Claude Code / Opus, day session). Overwrite at the end of each session; git history is the changelog._
 
-## DONE: the corpus is fully re-graded on two lenses, the model is retrained, the screen is current
+## Where this left off
 
-**2,973 postings, 118 batches, 0 rejected on import, one rubric version (`897123f3fc93`).** Two terminals ran it in parallel from opposite ends of the queue (`docs/OVERNIGHT.md`); they met in the middle with no collision. Model **`efc5c78495a7`**, rules `2f74427157f8`, report `Search_Results/Jobs_Found_20260916_0045.md`.
+Five commits, **local and unpushed**. The corpus is US-only, the ingestion bug that was silently
+throwing away most of four boards is fixed, both per-lens models are trained, and a user ruling
+unblocked ~6,000 postings that a bad clearance rule had flagged away.
 
-### The labels
-| lens | bullseye | adjacent | stretch | wrong |
-|---|---|---|---|---|
-| process | 382 | 649 | 195 | 1,744 |
-| technical | 224 | 436 | 333 | 1,977 |
+**Nothing has been rescreened yet.** `rules_version` moved `2f74427157f8` -> `287640fe1817` (the
+clearance fix), so every score in `screens` is stale with respect to the current rules. A normal
+sweep will NOT propagate that -- see "the rescreen trap" below.
 
-Lens buckets over the whole corpus (`both` = at least one bullseye): process-only **778** · technical-only **301** · **both 253** · neither 1,638.
-
-**255 roles recovered from the old `wrong` pool** (60 → bullseye, 195 → adjacent), and **no old bullseye fell to wrong**. That recovery is the entire justification for re-grading everything instead of sampling, and it is concentrated exactly where the old rubric was blind: FP&A, workforce/capacity analytics, and hybrid process+BI roles.
-
-### The retrained model
-| | single-lens (`330a4e0ce441`) | two-lens (`efc5c78495a7`) |
-|---|---|---|
-| AUC positives vs graded `wrong` | 0.946 | **0.973** |
-| AUC vs `stretch` | 0.776 | **0.836** |
-| held-out fit by grade | 0.75 / 0.62 / 0.46 / 0.19 | **0.77 / 0.68 / 0.43 / 0.15** |
-
-Top positive terms now lead with `finance`, then change management, analytics, process improvement, transformation, governance, dashboards, ai, forecasting, adoption, workforce. `finance` leading is new and is the FP&A recovery showing up in the weights.
-
-**Rescreen:** 80,272 rows in 540 s — candidate 130 → **228**, review 819 → **1,118**, reject 79,323 → 78,926. 397 more postings now survive Level 1, because the model no longer discards analytics and finance work as noise.
-
-### The result that validates the whole design
-Survivors by score band and lens bucket:
-
-| band | both | process | technical | neither |
-|---|---|---|---|---|
-| very_strong | **125** | 97 | 24 | **0** |
-| strong | 78 | 188 | 79 | 9 |
-| partial | 13 | 142 | 83 | 45 |
-| weak | **0** | 73 | 17 | **68** |
-
-**Half the very_strong band is dual-lens and not one `neither` reaches it; the weak band is the exact inverse.** The fit model trains on the AVERAGED grade and never sees the lens split, so this agreement is independent evidence that both the lenses and the score are measuring something real.
-
-**Survivors available for the three report lists: process 501 · both 216 · technical 203.**
-
-### Bug found and fixed: `model_version` hashed label IDs only
-Re-grading changed every grade but not a single `label_id`, so the first retrain produced a materially better model under an **identical version string**. `rescreen` re-screens a row only when `model_version` differs — it would have skipped all 80k rows and silently left every score on the old model, with no error anywhere. Caught because the metrics moved while the hash did not. Now hashed over `(label_id, label, weight)`, regression test added. **86 passing.**
-
-### Agreement with the user's own behaviour
-Of the postings he pursued: 17 bullseye · 9 adjacent · 7 stretch · 3 wrong. 72% agreement, unchanged in character from the single-lens run. The 10 contested rows are in `db/snapshots/llm_labels.csv` with `grade_process`, `grade_technical` and `favoured_lens` columns.
-
-## NEXT SESSION: START HERE
-1. **Build the three report lists** — strong process, strong technical, and `both`. `vw_lens_grades.lens_bucket` already computes them; `report.py` does not use it yet. This is the user's stated decision surface: he positions each application as process, technical, or both.
-2. **A fit model per lens** (sprint plan §18.8). The single TF-IDF model is the last place the one-axis design survives; `fit_process` and `fit_technical` are what ranking *within* each list needs.
-3. **Re-tune `pipeline.combine`** — content is at 0.90 from the 2026-09-15 sweep, but a two-lens content score may want its own blend.
-4. **Two both-list rows to eyeball as probable over-grades:** Airbnb "Senior Systems Engineer, BizTech" and Booz Allen "ICAM Operations Accelerator" — both look like engineering seats that slipped the platform-engineering exclusion.
-5. **Re-calibrate coverage** (`coverage --calibrate`); `vw_hard_negatives` can now draw on 1,361 graded `wrong` rows instead of 7 audited ones. Then re-run the §15.7 eyeball and decide 3b.
-6. The user still wants to eyeball ~100 labels from the CSV.
-
-## Housekeeping
-- `./progress.sh` reports where a batch run stopped; result files are the only source of truth.
-- `rubric_local.py` is gitignored; its backup is vault `Tools/Finder_Build_Personal_Appendix.md` §2, synced at `897123f3fc93` and pushed. **Re-sync it whenever the rubric changes.**
-- Local commits are unpushed in this repo; the user pushes.
-
-## Also done: the blend re-tuned to content 0.90, and the rubric's analytics cap removed
-
-### Level 1 was audited first, because the weight decision depends on it
-The gates hold. Recomputed over all 949 survivors: **zero location leaks** — remote 453 · nationwide/remote-
-unverified 372 · commutable hybrid 51 · commutable on-site 73, and nothing with 0 location points survives. Pay
-works (719 of 949 post a band; the $150K floor rejects correctly). Of the 88 bullseye/adjacent postings Level 1
-rejects, the causes are location 68 · outside the US 43 · junior level 16 — the gate doing its job. **Two soft
-spots:** 372 survivors (39%) are "nationwide, remote unverified" and survive on an assumption; 3 non-US rows
-(2 CA, 1 GB) plus 102 with no country code slipped the country rule.
-
-### The sweep (720 graded survivors, OUT-OF-FOLD fit)
-| content weight | AUC | P@20 | P@50 |
-|---|---|---|---|
-| 0.50 (was) | 0.537 | 0.85 | 0.84 |
-| 0.75 | 0.577 | 0.90 | 0.84 |
-| **0.90 (set)** | **0.589** | **0.90** | **0.90** |
-| 1.00 | 0.592 | 0.90 | 0.88 |
-
-Monotonic. Held at 0.90: 1.00 buys 0.003 AUC and 10% keeps a level/title tiebreaker among postings the gates
-let through. `rule_score` is unaffected — `profile_score` renormalizes over the non-content weights.
-`rules_version` **`a844b0d2d80d` → `2f74427157f8`**.
-
-**Rescreen: verdicts identical** (candidate 130 · review 819 · reject 79,323) — verdict comes from rule
-reasons, not the score. **Bands moved a lot**, which is the point: very_strong 123 → **189**, strong 358 → 241,
-partial 403 → 244, weak 65 → **269**. The distribution spread out instead of being dragged to the middle.
-
-| band | good-fit rate at w=0.50 | at w=0.90 |
-|---|---|---|
-| very_strong | 92% | **95%** (104 bullseye, 75 adjacent, 10 stretch, **0 wrong**) |
-| strong | 78% | **85%** |
-| partial | 33% | **43%** |
-| weak | 0% | **2%** (83 wrong, 43 stretch) |
-
-Named rows: Henry Schein R134977 **99** · Included Health Staffing Transformation **91** · Included Health
-Workforce Analytics Model Standardization **86** · Amentum Business Process Specialist **70** (strong) · Centene
-Medical Economics 88 (stretch, still high) · Humana Creative Ops 81. Report: `Jobs_Found_20260915_2235.md`.
-
-### The finding that matters more than the weight
-In-sample, fit AUC among survivors is 0.925. **Out-of-fold it is 0.592.** Mean OOF fit by grade, survivors only:
-bullseye **0.77** · adjacent **0.64** · stretch **0.65** · wrong **0.63**. The model separates bullseyes cleanly
-and **cannot tell stretch or wrong from adjacent** among postings that cleared Level 1. The retrain's real win is
-on the rejected population (OOF AUC 0.927) — it is excellent at discarding the obviously wrong. The confusable
-band is still confusable, and no weight change fixes that; Phase 3 coverage or Phase 4 LLM review has to.
-**Caveat that cuts the other way:** many of those unseparated `stretch` rows are analytics roles mislabelled by
-the rubric bug below, so part of this flatness may be label error, not model error.
-
-### The rubric bug: 0 of 3,009 postings could ever be a bullseye in the analytics lane
-`RUBRIC_PERSONAL` said *"SECONDARY lane (cap at `adjacent`): senior, strategic, leadership-facing data /
-analytics / BI work"* and gave the analytics record one clause: *"automating reporting pipelines in SQL and
-Python; Grafana, Plotly and Streamlit dashboards."* Consequence, measured: **bullseye by lane = primary 208,
-secondary 0.** The cap was structurally binding on 247 secondary-lane rows.
-
-It also cost real grades. Capital One "Principal Associate, Financial Planning & Analysis" → `stretch`:
-*"the core work is corporate FP&A, **a distinct finance discipline**"* — the judge called FP&A unfamiliar work
-because the record it was shown does not contain FP&A.
-
-**Rewritten from the §5 evidence sources** (`Resume_Bullets.csv`, `Resume_Blocks.csv`, `Bio_Jeff_Professional.md`),
-adding what was verifiably missing: the Force-to-Load capacity model (1,000-person field force, demand by day /
-hour / shift, $18-22M capacity variance, work priced in minutes with a modified PERT distribution, four versions
-in three years); the five-year FWA truck-roll forecast model (**FWA = Fixed Wireless Access, not fraud/waste/
-abuse**); FP&A forecasting and budget management ($3B demand vs $2.2B budget, Commitment View and Best View,
-DMAIC cycle-time cut of 70%); production data pipelines (Python/SQL over Oracle milestone tables with automated
-SPC charts replacing Minitab, the data architecture a data science team trained a prediction model on, a
-self-healing 12-source pipeline into PostgreSQL). The blanket cap is replaced by a rule that judges **the object
-of the analysis**: operations decisions (capacity, workforce, demand, throughput, forecasting, cost-to-serve) can
-be `bullseye`; other objects (marketing, product, risk) are `adjacent`; hands-on engineering IC seats (data
-engineer, analytics engineer, data scientist building ML/NLP/RAG) stay `wrong`. `rubric_version`
-**`645584b0771e` → `5f0f1755634b`**. Old file backed up outside the repo.
-
-**On the coding-assessment constraint — corrected mid-session.** The first argument for dropping it from the
-rubric was that Level 1 owns it. That over-claimed: `ASSESSMENT_GATE_TERMS` and `CODING_TEST_TERMS` only catch
-JDs that *say so* (and the coding rule only on tier 3), and `BLOCKED_POSTERS` is a short named list (Crossover).
-Most postings that will have an assessment do not mention one. **It still does not belong in the rubric**, for a
-better reason: the judge reading the JD has exactly the same information as the regex and cannot predict it
-either. The cap was not detecting assessment risk — it was using "is this an analytics role" as a proxy for it,
-and that proxy is what killed the workforce-analytics roles the user wants. Assessment risk is discovered, not
-predicted; it belongs in `BLOCKED_POSTERS` as it is learned, and in the user's judgement at application time.
-
-### NOT DONE — needs the user's go-ahead
-**The re-grade.** The labels in the DB still carry the cap. Scope: the 247 secondary-lane rows plus the ~368
-analytics-flavoured `wrong` rows ≈ **600 postings, ~24 batches, ~1.7M tokens**. Every crosstab above is measured
-against the OLD labels, so the true picture may be better than reported. `judge export` renumbers batches, so
-re-export against `5f0f1755634b` before grading.
-
-## NEXT SESSION: START HERE
-1. **Re-tune `pipeline.combine`.** blend AUC 0.814 < fit AUC 0.941 means the blend is now *destroying* signal.
-   The weights assume a weak fit model that no longer exists. Highest value, smallest change — same shape as
-   this session's win.
-2. **Re-calibrate coverage** (`coverage --calibrate`): the 7-negative problem is gone, `vw_hard_negatives` can
-   now draw on 2,107 graded `wrong` rows. Then re-run the §15.7 eyeball and only then decide 3b.
-3. **The user still wants to eyeball ~100 labels** (`judge report --csv db/snapshots/llm_labels.csv`). The
-   rubric line about capacity/workforce-planning frameworks was fixed *after* the run, so `rubric_version` has
-   changed and any re-grade will differ from that night's.
-4. Grade a fresh reject sample under the new screen to measure the miss rate out-of-sample.
-
-## Active Sprint
-@/docs/SPRINT_PLAN.md — §17.5 item 1 (retrain) is **DONE**; §17.7 acceptance boxes 4 and 6 are met. **Phase 3a
-is BUILT and its §15.7 eyeball FAILED; 3b and Phase 4 are still not started.** Coverage stays at weight 0. The
-3b decision is unchanged and still belongs to the user with Fable — the Phase 3a diagnosis below stands, except
-that its worst input (7 hard negatives) is now fixed and a re-calibration is worth running before deciding.
-
-## Known broken (pre-existing, not from this session)
-`tests/test_finder.py::test_rescreen_predicate_selects_only_new_changed_or_version_changed` fails on `main` at
-`3de36b4` as well — it expects one candidate and gets two. Almost certainly stale since the ingest-audit change
-that stamps `description_fetched_at` when text actually changes. **82 of 83 tests pass.**
-
-## Phase 3a — what was built (commit `ebcf40c`)
-- `backend/finder/evidence.py` — TOML manifest (`evidence.local.toml`, gitignored; `JOBSEARCH_EVIDENCE` overrides), csv / markdown / pdf / html / text loaders, 40–600 char units, kind weights, per-source `skip_headings` / `skip_patterns`, guards loaded but never embedded, `evidence_units` with `FLOAT[384]` vectors.
-- `backend/finder/requirements.py` — JD → requirement units with section, group (required / role), weight and class (work / level / logistics / domain); §16.4 years handling; line rejoining for career-site HTML; `splitter_fingerprint()`.
-- `backend/finder/embed.py` — bge-small-en-v1.5 loader (sentence-transformers, then fastembed), query instruction on the requirement side, JSON vector writer, `fetchnumpy` reader.
-- `backend/finder/coverage.py` — bands on raw cosine with kind weight applied to credit (§16.2), `not_in_record` / `light_in_record` tiers (§16.5), specificity (§16.3), unit cache, `cover()`, and `calibrate()` against hard negatives with blend AUCs and the paired source gap (§16.1).
-- `backend/finder/setup_check.py`, schema v4 (`evidence_units`, `requirement_units`, `coverage`, `hard_negatives`, `vw_coverage_latest`, `vw_hard_negatives`, `vw_decisions.reason_code`, coverage columns on `vw_shortlist`), CLI `evidence` / `coverage` / `setup-check`, `mark pass --reason <code>`, coverage stage in `pipeline.daily`, coverage fields in the Fit stanza, `docs/SETUP_CONTEXT.md`, `evidence.example.toml` + `tests/fixtures/evidence/`.
-- **Tests: 78 passing** (15 new). Personal-pattern scan empty. `setup-check` passes on this machine.
-
-## Phase 3a results on the scratch DB (1,983 survivors, 2,888 evidence units, evidence `74156dda6991`)
-| Acceptance check (§15.7 / §16.9) | Result |
+| commit | what |
 |---|---|
-| Henry Schein R134977 covers ≥ 80 | ❌ **53.8** required (5 of 40 strong, 35 partial) |
-| Each named misfire ≥ 20 points below it | ❌ CVS VP & COO **50.0** · Novartis AI Foundations **50.0** · Centene Sr Dir Medical Economics **52.0** · Humana Creative Ops **52.5** · Centene VP Medicare **50.0** — all within 4 points |
-| Paired vault vs career-site gap < 5 points | ✅ **0.14** points (n = 42) |
-| Coverage of all survivors < 15 min | ❌ cold **22 min** (1,330 s; 1,216 s of it first-time embedding) · ✅ warm **132 s** from the unit cache |
-| Sweep runs with no embedding library | ✅ `coverage_stage` logs the reason and returns None |
-| Hard-negative view populated | ✅ 207 (7 audit + 200 top-fit unlabeled) |
-| Calibration report | ✅ printed; see below |
-| Specificity spot check | ✅ boilerplate sinks (salary / benefits / "kept confidential" lines 0.26–0.27, 74–223 postings each); unique lines 1.0; median 1.0, p25 0.79 |
-| Step 3a at weight 0, both figures in the stanza | ✅ final scores identical before and after coverage |
+| `8ea32db` | Workday CXS clamps `total` at 2000: detect, scope to US, never close-pass |
+| `ff691c7` | A fit model per lens (18.8) |
+| `3ac4b51` | `board_facets` discovery; clamp detector corrected to a single-valued facet |
+| `740c9a7` | Clearance is a blocker only when it must already be HELD |
+| (uncommitted) | plan executor + facet key fix + live scope verification |
 
-**Calibration `5a888e545929`** (628 s; 362 positives, 57 with career-site text · 207 hard negatives · 300 pseudo): chose COVER_STRONG **0.74**, COVER_PARTIAL **0.54** (the grid's bottom edge), COVERAGE_REJECT 43.9, COVERAGE_REVIEW 47.9. AUC positives vs hard negatives: coverage_required **0.598** · coverage_role 0.527 · gated 0.590 · fit held-out 0.383 (expected: those negatives are the fit model's own top scorers) · best blend weight 0.9 (i.e. the blend prefers almost no coverage). Sanity AUC vs pseudo-negatives 0.623. Medians: positives 50.29, hard negatives 50.00.
+## NEXT SESSION: START HERE
+1. **`rescreen-all`** -- the clearance fix reaches nothing until this runs. Expect ~6,000 postings to
+   lose the "unreachable" flag and a batch of federal-contractor roles to surface (CACI "Business
+   Process Consultant" 93, Guidehouse "Senior Business Process Analyst" 91 were both flagged away).
+2. **Partition strategy** for the three boards that are clamped with no country facet -- Booz Allen,
+   Leidos, Sentara. Booz Allen's job families are 1,172 / 766 / 445, each under the 2,000 ceiling, so
+   it is fully enumerable. The plan executor already supports `partition`; only the plan *builder*
+   and the completeness assertion are missing.
+   **Acceptance test that is now possible:** after a partitioned pull, assert the union size matches
+   the board's `timeType` sum (Booz Allen 2,386). If it comes back 2,000 the partition did not work.
+3. **`screens.fit_process` / `fit_technical`** -- schema, scoring in `pipeline.screen`, then a full
+   rescreen so all 66k rows carry a lens prediction.
+4. **Then the three report lists** (strong process / strong technical / both) with a `lens_source`
+   column marking whether each row was placed by the user, the judge, or the model.
+5. **VACUUM / defrag** -- the user asked for this; 22,660 postings and 82,734 screen rows were
+   deleted today and the file is still ~1.36 GB.
+6. **Pending user decision:** record a `user-adjudicated` label on Guidehouse "Senior Business
+   Analyst" (see "judge variance" below). He ruled `adjacent`, not bullseye.
 
-## Why it failed (diagnosis, for the 3b design decision)
-1. **The cosines have no dynamic range on this data.** Best-match cosine over sampled survivors: min 0.54 · p25 0.62 · **median 0.65** · p75 0.72 · max 0.84. §16.2 assumed related sentences sit at 0.75–0.90; with bge-small they sit near 0.65 whether or not the requirement is a real match.
-2. **So every requirement lands in one band.** Over the survivor set: **93.3 % partial, 5.6 % strong**. Credit therefore ≈ 0.5 × kind weight for nearly every unit, and coverage collapses to a constant: survivor `coverage_required` p05 46.2 · p25 50.0 · **median 50.0** · p75 52.0 · p95 56.6. A 10-point range cannot separate anything.
-3. **Calibration could only pick the degenerate corner.** Maximizing a flat AUC surface drove COVER_PARTIAL to the grid's lowest value, which is the "give everything partial credit" solution.
-4. **The negatives are not the problem.** Positives separate from audited misfires, the fit model's confident mistakes and random pseudo-negatives at almost the same AUC (0.71 / 0.72 / 0.71 on the subset that has coverage). Coverage is not confusing near misses with fits — it is not ranking anything.
-5. **What does work:** the source-invariance fix (0.14-point paired gap), specificity (boilerplate down to 0.26), the evidence pipeline (matches are dominated by `resume_bullets` and `soar_stories`, the achievement-kind sources, exactly as intended), and the unit cache (warm re-cover 132 s).
-6. **Symptom worth seeing:** ranking survivors by `coverage_required` puts GitLab "Staff Backend Engineer" (77.0), Guidehouse "Data Platform Lead" (73.0) and "Adobe Commerce Sr. Solutions Architect" (63.7) on top — short, terse requirement lists with few units, where noise dominates.
+## The rescreen trap (established 2026-09-16, worth not re-learning)
+`sweep.run` calls `pipeline.daily(since=stats["started"])`, and `_candidate_sql` ANDs that on top of
+the rescreen predicate:
 
-## Ingest audit, prompted by a JD the user pasted (2026-09-15 late)
-The user pasted the AHEAD JD he had applied to and asked whether we held that detail. **We did not.** That one
-question found a platform-wide ingest bug and cleared a second platform.
+```sql
+AND (p.first_seen_at >= ? OR p.description_fetched_at >= ?)
+```
 
-- **Lever was storing the wrapper, not the job.** `lever_jobs` read `description` (opening blurb) and `additional`
-  (EEO, benefits) and never `lists`, where Lever keeps every duty, requirement and skill section. 506 postings at
-  6 employers — AHEAD, Included Health, Aledade, Aprio, FiscalNote, Life.Church — were scored on boilerplate.
-  AHEAD's posting went **2,756 → 5,826 chars**; the platform median went **3,297 → 5,808**. Fixed, tested,
-  re-swept (no delete needed: the upsert refreshed text in place and kept `first_seen_at` and lifecycle).
-- **Re-screening the 502 corrected rows: 4 very_strong · 38 strong · 19 candidate · 66 review** — ~85 postings
-  that were invisible an hour earlier. Re-graded by Sonnet (21 batches): **9 bullseye, 15 adjacent**, including
-  **Included Health "Director, Staffing Transformation & Operations" (bullseye, score 93)** and Included Health
-  "Workforce Analytics Model Standardization Consultant" (bullseye, 79) — the user's own GNO capacity work.
-- **A second, quieter bug on the way:** the upsert refreshed `description_text` without touching
-  `description_fetched_at`, so the finder never re-screened text an ingest fix had rewritten. Now stamped when the
-  text actually changes — **in UTC**, because the finder writes `screened_at` in UTC while DuckDB's `now()` is
-  local, and a local stamp read as hours in the past would have silently disabled every future re-screen.
-- **Oracle ORC audited and cleared.** Its lower median (3,304 vs Workday's 6,197) is employer mix, not a dropped
-  field: the adapter already reads `ExternalDescriptionStr` + `ExternalResponsibilitiesStr` +
-  `ExternalQualificationsStr`. Verified against the live API on the user's NFCU "Principal Business Analyst":
-  Qualifications 3,302 and Responsibilities 2,019 chars are both present in our 5,056 stored characters. The
-  fields we skip are correctly skipped (`CorporateDescriptionStr` is the company blurb, `ShortDescriptionStr` a
-  teaser, `Internal*` byte-identical duplicates). **One refinement made:** Oracle returns those sections
-  unlabelled, so the splitter could not tell the role section from the person section — the detail fetch now
-  writes `Responsibilities` / `Qualifications` headings as it joins them (applies to newly fetched rows).
-- **Near-miss worth remembering:** `db/batches_rejects/` was not gitignored and 25 JD batch files were briefly
-  tracked; the pre-commit personal-pattern scan caught it and they were dropped from the tip commit before any
-  push. `.gitignore` now covers `db/batches*/`.
+So on a routine sweep, `rules_version != ?` / `model_version != ?` are **necessary but not
+sufficient** -- the row must also have been first seen or re-fetched in that run. New reqs and
+changed JDs get the new rules/model; the rest of the corpus keeps its old scores, silently, with no
+error. **After any rules or model change, run `rescreen-all` explicitly.**
 
-## The labeling run (sprint plan §17) — 2,573 graded labels, 2026-09-15 night
-**Done:** every screen survivor (1,940 postings in 78 batches) plus a deliberate 599-posting reject sample, graded
-by Claude Sonnet subagents against `rubric.RUBRIC_PUBLIC` + `RUBRIC_PERSONAL`. **0 rows rejected on import.**
-Distribution: **bullseye 205 · adjacent 332 · stretch 319 · wrong 1,717**.
+Changed JD text *is* handled automatically: the upsert bumps `description_fetched_at` only when the
+text actually differs, and the screen stage runs after the detail stage.
 
-### What it proves about Levels 1 and 1.5 (the question worth the tokens)
-| band | bullseye | adjacent | stretch | wrong | n | good |
-|---|---|---|---|---|---|---|
-| very_strong | 24 | 17 | 17 | 20 | 78 | **53%** |
-| strong | 33 | 50 | 43 | 92 | 218 | **38%** |
-| partial | 6 | 9 | 6 | 55 | 76 | **20%** |
-| weak | 0 | 1 | 1 | 5 | 7 | **14%** |
+## Sweep run `bd57bcfd` (2026-09-16, 22.0 min)
+137 boards ok, 0 failed, 84,112 live, **7,888 new**, 22 reopened, 4,453 taken down, 5,281 JDs fetched.
+Screen: 7,942 rows -> 16 candidate / 68 review.
 
-The rules + fit model order the corpus correctly at the band level — a clean monotonic gradient. **But the score
-cannot separate degrees of fit:** mean final score by grade is bullseye 82.0 · adjacent 80.0 · stretch 79.8 ·
-wrong 72.8. It tells `wrong` from the rest by ~8 points and tells the other three apart not at all. That is the
-precision problem, quantified.
+**1,380 of those take-downs were false** and have been reopened (ids snapshotted outside the repo).
+They came from the four clamped boards. One was verified still live on the ATS: Accenture
+"Consulting Advanced Degree Consultant - Health" (`strong`, 70). Leidos "Program Financial Analyst V"
+(`very_strong`, 87) was a genuine 404. Four Booz Allen rows are unresolved -- the API answers 403
+(WAF) and the public page is an SPA shell, so neither proves anything.
 
-### Level 1's miss rate, measured for the first time (599 graded rejects)
-wrong 472 (79%) · stretch 50 · **adjacent 44 · bullseye 33 — about 13% of rejects are work the user should see.**
-Cause of each good rejection: not remote / outside commute 57 · outside the US 34 · **content does not fit 24** ·
-comp below floor 13 · junior level 9. Location, country and comp rejections are correct. **The content gate is the
-defect:** it killed Amentum "Business Process Specialist" at fit **0.12** and Booz Allen "Digital Transformation
-Specialist" at 0.34 — literal primary-lane work discarded as noise by the vocabulary model. Retraining with the new
-negatives is aimed straight at this.
+## The Workday `total` clamp
+Accenture reports `total=2000` against a real count of ~44,187. We were ingesting **4.5%** of the
+board and close-passing the rest as taken down. Offsets past the ceiling return page 1 again, so
+there is no paginating around it.
 
-### Agreement with the user's own behaviour
-Of 36 postings the user pursued: **27 agree** (18 bullseye, 9 adjacent), 9 contested (5 stretch, 4 wrong) — 75%.
-Reviewed row by row with the user 2026-09-15:
-- **Judge right (4):** Angi Principal Analytics Engineer (dbt/Snowflake IC, assessment-gated), Zillow Senior Talent
-  Intelligence Analyst (market research; the overlap was mode, not object), both Capital One data-analytics roles
-  (econometrics / model-risk validation).
-- **Judge partly right (1):** Airbnb Senior Programs & Business Operations Lead — graded `wrong`, but the posting
-  exists because "no one owns the demand-side merchandising strategy", which is the user's own pattern. Stretch.
-- **Unjudgeable (2 of the contested, plus 1 more):** Capital One Sr. Business Manager, AHEAD Senior Manager
-  Enterprise Transformation, ADF General Application — the stored text is competency boilerplate or marketing copy.
-- **Judge WRONG (1), and it is a rubric bug:** Fannie Mae "Strategic Workforce Planning - Principal" asks for
-  designing an enterprise workforce-planning **framework**, buy-in without authority, and workforce cost/capacity
-  trade-offs in a regulated environment — the GNO capacity model. The judge downgraded it because the work sits in
-  HR. `RUBRIC_PERSONAL` already says capacity-planning **models** are primary lane and only the staffing cycle is
-  not; the judge applied "domain-gated" to a department instead of to the object of the work. **Fix the rubric line
-  before the next run.**
+**Detection must use a SINGLE-VALUED facet.** The first attempt compared `total` against the widest
+facet sum, which is wrong: a posting in three cities counts three times in the location facet, and
+`workerSubType` is multi-valued too (Accenture 86,767 against 44,187 postings). That called Autodesk
+(405) and Guidehouse (757) clamped when both are complete. `timeType` is one value per posting:
 
-### Contested labels are excluded, not overruled (user decision)
-The user pushed back on "your decisions outrank the judge", correctly: pursuit decisions were made under pressure
-and are noisy positives. A conflict now means the row is **contested and trained on by neither side**. New table
-`training_exclusions` (schema v6) plus `finder.py judge exclude --posting <id> --reason ...`, and an auto-rule that
-retires any posting the judge called too thin to read (**34 caught**, plus ADF and AHEAD by hand).
+| board | total | timeType | ratio | verdict |
+|---|---|---|---|---|
+| Accenture | 2,000 | 44,216 | 22.11 | clamped |
+| Booz Allen | 2,000 | 2,386 | 1.19 | clamped |
+| Leidos | 2,000 | 2,192 | 1.10 | clamped |
+| Henry Schein / Autodesk / Guidehouse / GE Vernova | — | — | 1.00 | genuine |
 
-## Live run 2026-09-15 20:11 — coverage on the live DB, second report written
-- **A WSL crash at 19:42 killed the first attempt** mid-coverage (evidence stage had finished at 19:39:59). Nothing
-  was lost or corrupted: `requirement_units` commits per 200-posting batch, so 17,038 units survived and the plain
-  rerun resumed. **Coverage is crash-resumable; just rerun `finder.py coverage && finder.py report`.**
-- Live totals: evidence 2,888 units (version `74156dda6991`, 4 min) · coverage **1,983 postings in 870 s** (partly
-  warm) · report written at 20:11:47 → vault `Search_Results/Jobs_Found_20260915_2011.md`.
-- **Comparison with the 18:21 report** (both pipeline files, 150 summary rows each): the summary tables are
-  **identical — 150 rows in both, none added, none dropped**, confirming §16.6 held (coverage at weight 0 changed no
-  score). **Zero block overlap**: the 14-day `surfaced` rule pushed the blocks to ranks 16–30, so the two files
-  together give 30 escalated JDs rather than the same 15 twice. The new file's Fit stanzas carry the coverage fields.
-- **New finding from reading those stanzas — company boilerplate is being scored as requirements.** Reported gaps
-  include "Strong interest in Angi, home services, marketplaces…", "To learn more about the culture, rewards and
-  benefits…", "San Antonio, TX, Charlotte, NC, Tampa, FL or Phoenix, AZ.", "At Caylent, our people always come
-  first.", "Disability and life insurance". These are intro / benefits / location text that `split_requirements`
-  admitted into the required and role groups, where they can never match evidence and drag every JD toward the same
-  middling score. That is a second, independent cause of the flat ~50 distribution, and it is fixable without
-  touching the encoder: tighten `DROP_HEADINGS` / intro handling and drop units that are marketing or benefits text.
-  The `not_in_record` tagging works correctly in the same stanzas ("… (e.g., PMP, CIPS) is a plus. [not_in_record: pmp]").
-- **Logging note:** Python block-buffers stdout through a pipe, so these run chains look silent until they finish.
-  Use `python -u` in future background chains.
+**Probing past the ceiling is NOT a usable test** -- Workday answers any out-of-range offset with
+page 1, so even a genuine board looks like it has more. Do not re-try that approach.
 
-## Option A was prototyped and also fails (2026-09-15, scratch DB, read-only)
-Contrast scoring — score each requirement by how far its best evidence cosine stands above that requirement's own
-baseline against the whole evidence store — was measured on the stored vectors (no re-embedding). Variants: `gap`
-(best − mean), `z` ((best − mean)/std), `top5` (mean of the 5 best − mean), `abs_best` (the current absolute cosine)
-and `gap_kw` (kind weight applied before the max). Over 1,772 postings with ≥ 3 required work units:
+## `board_facets` / `board_scope` and the plan executor
+Ask each board what it can filter by; never hardcode a facet id. Two tables: `board_facets` (every
+facet parameter, nested group, value id, descriptor, count) and `board_scope` (the resolved
+strategy). `backend/ats/facets.py` discovers and resolves; `finder`/sweep passes the scope into
+`adapters.list_jobs(row, scope=...)`.
 
-| variant | AUC pos vs audit | vs fit_top | vs pseudo | Henry Schein rank | worst misfire rank |
-|---|---|---|---|---|---|
-| gap | 0.47 | 0.50 | 0.62 | — | Centene VP Medicare **40** / 1,772 |
-| top5 | 0.48 | 0.57 | 0.75 | 242 | Novartis AI Foundations **84** |
-| abs_best | **0.73** | 0.50 | 0.75 | 360 | Novartis 725 |
-| gap_kw | 0.48 | 0.65 | 0.63 | 859 | Humana Creative Ops **152** |
+**The pull is a plan executor**, so every strategy is one code path with a different plan:
+`plain` = one unfiltered pull, `country` = one filtered pull, `partition` = one pull per facet value
+unioned on the req key, `truncate` = pull what we can and block the close-pass. Adding `partition`
+is a plan *builder*, not a new pull mechanism.
 
-No variant puts the bullseye above the misfires consistently, and every variant's top 8 is dominated by engineering
-and consulting roles (GitLab Staff Backend Engineer, Guidehouse Data Platform Lead, Databricks Field Engineering,
-Perficient Adobe Commerce). **Caveat:** only 21 labeled positives have coverage rows on this corpus, so the AUCs are
-noisy; the named-row ranks are the interpretable signal, and they are bad. Conclusion: the ceiling is the sentence
-encoder's discrimination on this text, not the band scheme layered on top of it. Option A is not worth building.
+**Three tenant behaviours, and only a live probe tells them apart:**
+- applied correctly (Accenture)
+- rejected with HTTP 400 (Booz Allen, Sentara -- they expose no country facet at all, only a flat
+  city list)
+- **accepted and silently ignored** (GE Vernova returned an unchanged total and French locations)
 
-**Analysis caveat for anyone re-running this:** DuckDB's `fetchnumpy()` returns NULL DOUBLEs as `NaN`, not `None`,
-and `requirement_units.spec` is written only for the units that survive the 40-unit cap — so a naive
-`spec is not None` guard silently poisons every JD with more than 40 work units. The first prototype run was invalid
-for that reason (`nan` scores, AUCs of exactly 0.500). Production is unaffected: `score_units` computes specificity
-in memory for all work units before capping.
+So `verify_scope` applies the facet for real and keeps it only when the total actually drops.
 
-## Options for 3b (not built; the user decides with Fable)
-- ~~**A. Contrast instead of absolute bands.**~~ **Prototyped 2026-09-15 and rejected** — see the section above.
-- **B. A stronger encoder** (bge-base / bge-large / e5-large) for wider spread, at 3–10× the embedding cost; the unit cache makes a one-off re-embed tolerable but the daily path slows too.
-- **C. Keep bands, fix the inputs:** require a minimum `n_required` (the tech-role artifact above), raise the specificity floor so generic lines cannot carry credit, and hand-set thresholds from the observed distribution rather than letting a flat AUC choose them.
-- **D. Skip to Phase 4 for the top N** (LLM review reads context directly) and keep coverage as a reported figure only.
+**The filter key is not the tree's parameter name.** Workday nests countries under
+`locationMainGroup` -> "Country", but you filter on **`locationCountry`**. Filtering on
+`locationMainGroup` answers HTTP 400. Tenants exposing a top-level country parameter
+(`Location_Country`, `LocationCountry`, a custom `CF_-_REC_-_...` field) use that name directly.
 
-## Deviations from the spec (for the Fable audit)
-## Phase 3a deviations (for the Fable audit)
-1. **PDF text without `-layout`.** `pdftotext -layout` interleaves the LinkedIn export's two columns on one line; plain `pdftotext` gives reading order (sidebar, then main). §15.1 said `-layout`.
-2. **No pyarrow.** Vectors are written as one JSON payload (`json_transform` → `FLOAT[]` → `FLOAT[384]`) and read per row with `fetchnumpy()` + `np.stack` (5k vectors: write 0.7 s, read 0.03 s). Binding `?::FLOAT[384]` per row is used only in the cosine test.
-3. **Splitter additions to §15.2:** `PERSON_HEADINGS` (skills, knowledge, experience, education, who you are…) count as Required for coverage only (Henry Schein's requirements sit under "SPECIFIC KNOWLEDGE & SKILLS"); `DROP_HEADINGS` for about-us / benefits / pay / EEO; text before the first recognized heading is `intro` at weight 0.5 (role group); an unrecognized Title Case or colon-ended label line is skipped; lines are rejoined when career-site HTML split a sentence around bold spans; employer notices (pay-range statements, scam warnings, career-site pointers) are dropped; any line naming pay is logistics.
-4. **Requirement units are embedded uncapped**, then specificity, then the 40-unit cap (§16.3 needs specificity before the cap). Identical unit texts across postings are encoded once (46,374 unique of 64,760 work units on the survivor set).
-5. **Specificity reference = every survivor's cached work units**; a posting outside the survivor set (calibration docs) is measured against the same reference with N + 1. Spec is stored on first coverage and recomputed only by `coverage --all`, so it drifts slowly as the survivor set changes.
-6. **Coverage table columns** follow §16.3 (two figures + counts per group) instead of §15.3's single `coverage / n_work / n_strong / n_partial`; PK adds `calibration`, so a re-calibration re-scores from the unit cache without re-embedding.
-7. **Hard negatives:** `vw_hard_negatives` = `pass` decisions with reason code `function` ∪ table `hard_negatives` (audit ids from `AUDIT_NEGATIVES` + the top-fit unlabeled postings with no function term, rewritten by each calibration). `AUDIT_NEGATIVES` is exempt from `rules_version` (a calibration input), so adding ids never forces a rescreen.
-8. **Reason codes** are parsed from the reason text (`function: …`), not a new column: `vw_decisions.reason_code` (existing free-text passes = `other`). `mark pass` refuses a reason that does not start with a code.
-9. **Calibration fit AUC uses held-out fit** (a fresh cross-validation with the newest model's parameters); in-sample fit would flatter the fit model against coverage. Pseudo-negatives for the sanity AUC default to 300 (not 1,500) to save embedding time.
-10. **Encoder:** sentence-transformers 6.0.1 on CPU torch 2.14 (4 threads), ~50 units/s. fastembed 0.8 (ONNX) was installed and measured slower on this machine (90 s vs 40 s per 2,000 units, vectors within 0.0009), so `auto` picks sentence-transformers. First model load downloads ~130 MB into `~/.cache/huggingface`.
-11. Evidence manifest gained `skip_headings` / `skip_patterns` per source (vault documents carry AI-usage notes, coaching notes and negative positioning statements that would otherwise match JD text).
+US matching is by **exact descriptor**, never substring: `"United"` also matches United Kingdom and
+United Arab Emirates, both live in Accenture's own country list.
 
-## Pending
-- [ ] **Decision: which 3b option (or none).** Phase 4 stays blocked until coverage earns its weight (§16.6).
-- [ ] **Bug: the term tiers are not in the coverage cache key.** `evidence_version` hashes unit ids + model only, so
-      editing `not_in_record` / `light_in_record` leaves existing `coverage` rows untouched and `coverage` reports
-      "0 postings" instead of re-scoring. Fold a hash of both lists into `evidence_version` (re-scores from the unit
-      cache, no re-embedding). Tonight's live run is unaffected: the live DB had no coverage rows.
-- [x] ~~Confirm the `not_in_record` starter list~~ — confirmed by the user 2026-09-15 and applied before the live run:
-      `not_in_record` = Prosci certification / certified, PMP, Azure; `light_in_record` = Power BI, Tableau, Looker,
-      Qlik, ThoughtSpot, Prosci (bare), CSM, AWS, GCP. Resume rule unchanged: never claim Power BI or Tableau.
-- [ ] Run the live DB through `evidence --rebuild` → `coverage` when 3b lands (cold cost ≈ 25 min; the live corpus is slightly larger than the scratch copy).
-- [ ] Push: commits `ebcf40c` and this one are local only; the user pushes.
-- [ ] Carried: SmartRecruiters / Workable JD backfill (5.1 % / 0.8 % coverage); daily schedule; long-tail adapters (iCIMS, Dayforce, Radancy, BrassRing); registry "VERIFY" rows; aggregator keys; cleanup of `db/jobsearch.duckdb.v1-backup-20260915` and the history bundle.
+## The corpus is US-only now
+**22,660 non-US postings and 82,734 screen rows deleted** (101 MB of JD text). 88,947 -> 66,287.
+
+Guarded: anything carrying an LLM grade, a decision or a `label_docs` row survived (710 rows),
+preserving **823 graded labels including 25 process-bullseye and 61 process-adjacent**. NULL-country
+rows (8,216) were left alone -- unknown is not non-US. Identifiers backed up outside the repo.
+
+Accenture's board is 86% India (38,911 of 45,219); US is genuinely ~731. That is where the deleted
+volume came from, and the `country` strategy is what stops it coming back.
+
+**SQL trap:** the first delete predicate used `NOT IN (SELECT posting_id FROM tracker)` and **all 336
+tracker rows have NULL `posting_id`**, which makes `NOT IN` return zero rows for everything. Use
+`NOT EXISTS`. Also note the tracker matches by fuzzy name, not posting id, so it guards nothing --
+`llm_labels` and `decisions` are what actually protect the user's history.
+
+## Per-lens fit models (sprint plan 18.8) -- zero tokens, trained from existing labels
+`vw_label_set_process` / `vw_label_set_technical` mirror `vw_label_set` but carry that lens's grade
+and admit only rows judged on it. Shared sources (vault documents, decisions) stay in both: they
+describe the candidate, not a lens. `train(lens=)` stores under `kind='tfidf_lr_<lens>'`;
+`latest_row(lens=)` asks for one by name.
+
+| | process `c80d6fb39bc7` | technical `3fee819b2a64` |
+|---|---|---|
+| pos / neg | 1,358 / 3,411 | 985 / 3,784 |
+| CV AUC | 0.951 | 0.951 |
+| P@20 | 1.00 | 0.98 |
+| bullseye/adjacent/stretch/wrong | .80 / .68 / .51 / .22 | .79 / .64 / .43 / .19 |
+
+The real evidence is the vocabularies, which came out genuinely distinct: process leads with
+project / governance / change management / transformation; technical with analytics / finance /
+dashboards / forecasting / bi. `auc_vs_stretch` (0.776 / 0.794) is NOT comparable to the single
+model's 0.836 -- each is judged against its own lens's labels.
+
+## Clearance: held vs obtainable (user ruling, high impact)
+> "Any req that has the word OBTAIN means they might be willing to pay for it and fund it so that is
+> NOT a blocker. But if they require it be possessed already and active that is the blocker."
+
+Measured over the 11,325 postings carrying the old flag:
+**5,300** require a held or unsponsored hard clearance, **3,859** say "ability to obtain", and
+**2,165** matched nothing but a compensation paragraph (*"...skill sets, experience, security
+clearances, licensure..."*). So ~6,000 were flagged away over language that is not a requirement.
+
+It was costing exactly his lane: CACI "Business Process Consultant" (93), Guidehouse "Senior Business
+Process Analyst" (91), "Senior Financial Transformation Consultant" (89), "Business Process Analyst
+(Finance)" (86), "Change Management / Communication Lead" (86).
+
+Now: held/current language, or a hard level (TS/SCI, Top Secret, Secret, polygraph) with no offer to
+sponsor -> unreachable. "Ability to obtain" at **any** level -> reachable. Boilerplate -> nothing.
+
+## Judge variance is real -- correcting an earlier claim
+Guidehouse posts the same "Senior Business Analyst" as **two reqs, 43463 and 43549**, whose JDs are
+**99.994% identical (they differ by one period)**. Same rubric version, same scorer, different batch.
+They were graded differently:
+
+| | 43463 | 43549 |
+|---|---|---|
+| overall | stretch | adjacent |
+| process | adjacent | **bullseye** |
+| technical | wrong | stretch |
+
+The model scored both identically (70, fit 0.753) -- the variance is entirely in the judge. So
+"the same JD and rubric produce the same grade" is **false**, and re-grading is not pure waste.
+
+Across 85 near-duplicate graded groups (same employer + title + pay), **21 (25%) show the judge
+disagreeing with itself.** Caveat: same employer/title/pay does not guarantee identical text, so 25%
+is an upper bound; the Guidehouse pair is the clean proof.
+
+**The user adjudicated it himself and sided with the LOWER grade** (`adjacent`): the process
+components are strong, but the role is heavy on requirements documentation and user stories, which
+he has not done much of outside ~1 year as a scrum master. Worth recording as `user-adjudicated`.
+
+Related record gap: he *is* writing product requirements now -- Forester, Meridian, jobsearch, in
+agentic AI-assisted development -- and none of it is in the evidence the judge reads.
+
+Also: duplicate reqs are stored as separate postings, which inflates the corpus and splits their
+grades. Deduping near-identical JDs per employer is a small separate win.
+
+## Carried over
+- SmartRecruiters / Workable JD backfill; daily schedule; long-tail adapters (iCIMS, Dayforce,
+  Radancy, BrassRing); registry "VERIFY" rows; aggregator keys.
+- Cleanup of `db/jobsearch.duckdb.v1-backup-20260915` and the history bundle.
+- Coverage/Phase 3b is still blocked and unchanged -- `vw_hard_negatives` can now draw on 1,361
+  graded `wrong` rows instead of 7 audited ones, so re-calibrate before deciding.
+- `rubric_local.py` is gitignored; its backup is vault `Tools/Finder_Build_Personal_Appendix.md` §2,
+  synced at `897123f3fc93`. Re-sync whenever the rubric changes.
 
 ## Run
 ```bash
-.venv/bin/python sweep_ats.py                                   # all stages, report written last
-# by hand, same order — never stop before the report:
-.venv/bin/python finder.py labels --report && .venv/bin/python finder.py train --report \
-  && .venv/bin/python finder.py rescreen-all && .venv/bin/python finder.py sync \
-  && .venv/bin/python finder.py evidence --rebuild && .venv/bin/python finder.py coverage \
-  && .venv/bin/python finder.py report
-.venv/bin/python finder.py setup-check                          # personal files, dependencies, manifest, schema
-.venv/bin/python finder.py evidence --check | --rebuild         # evidence manifest -> evidence_units
-.venv/bin/python finder.py coverage [--all] [--limit N]         # requirement coverage for survivors
-.venv/bin/python finder.py coverage --calibrate                 # thresholds vs hard negatives (§16.1)
-.venv/bin/python finder.py mark <id> pass --reason "function: wrong lane"   # a calibration negative
-.venv/bin/python finder.py shortlist --days 7 --n 30            # req / role coverage columns
-.venv/bin/python -m pytest -q                                   # 78
+.venv/bin/python -u sweep_ats.py                 # all stages; --no-report to skip the vault file
+.venv/bin/python finder.py rescreen-all          # REQUIRED after any rules/model change
+.venv/bin/python -m pytest -q                    # 103
 ```
-The eyeball and diagnostic scripts used above live in this session's scratchpad; they read `vw_coverage_latest`, `hard_negatives`, `requirement_units.spec` and the stored `matches` / `notes` JSON, all of which are in the DB.
