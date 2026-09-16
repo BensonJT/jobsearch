@@ -76,6 +76,43 @@ positive. If you would rather it were contested-and-excluded, that is
 `finder.py judge exclude --posting <id> --reason ...`. Angi and Zillow needed no action — their
 user-adjudicated `wrong` rows correctly beat their vault positives.
 
+## IN FLIGHT: the full re-grade under the corrected rubric — RESUMABLE, just continue
+
+**118 batches staged in `db/batches_relabel/` (gitignored), rubric `7958bdf42066`, 2,946 postings + 27
+near-duplicates that copy their representative.** Every batch result is written the moment that batch finishes,
+so stopping anywhere costs at most one batch. The user's 5-hour session token budget will likely run out
+mid-run; his weekly budget refreshes 8 AM.
+
+```bash
+cd /home/bensonjt/code/jobsearch                       # = /mnt/e/code/jobsearch
+.venv/bin/python finder.py judge status --dir db/batches_relabel        # where did we stop
+# grade the pending batches: one Claude Code subagent per batch, 6-8 in parallel, Sonnet. Prompt:
+#   read db/batches_relabel/batch_NNN.md, grade every posting, write db/batches_relabel/batch_NNN.result.json
+#   as a JSON array of {posting_id, grade, lane, confidence, blocker, rationale}; reply with ONLY the count
+#   and the grade tally.
+.venv/bin/python finder.py judge import --dir db/batches_relabel --scorer claude-sonnet-batch   # safe to re-run
+```
+
+**Why the whole corpus and not the cheap 600 (user's call, and he is right):** the analytics cap pushed roles
+into `wrong`, not only into `stretch`, so the 2,111 `wrong` rows are exactly where recovered fits will be found.
+A stratified sample would have measured the migration matrix but not recovered the rows.
+
+**When the grading finishes, in this order:**
+```bash
+.venv/bin/python finder.py judge import --dir db/batches_relabel --scorer claude-sonnet-batch
+.venv/bin/python finder.py judge report --csv db/snapshots/llm_labels.csv    # agreement + the CSV to eyeball
+.venv/bin/python finder.py labels --report && .venv/bin/python finder.py train --report
+.venv/bin/python finder.py rescreen-all && .venv/bin/python finder.py sync && .venv/bin/python finder.py report
+```
+
+**What to measure and compare against this file's numbers:** the grade distribution vs the old
+bullseye 208 / adjacent 349 / stretch 338 / wrong 2,114; **the migration matrix (old grade x new grade) — the
+whole point, especially `wrong` -> bullseye/adjacent**; OOF fit by grade among SURVIVORS, which was the flat
+bullseye 0.77 / adjacent 0.64 / stretch 0.65 / wrong 0.63; and whether 5-fold AUC and AUC-vs-`wrong` move.
+
+**New labels do not collide with old ones** — `llm_labels` PK includes `rubric_version`, and
+`vw_llm_labels_latest` takes user-adjudicated first, then newest, so the new grades win automatically.
+
 ## Also done: the blend re-tuned to content 0.90, and the rubric's analytics cap removed
 
 ### Level 1 was audited first, because the weight decision depends on it
