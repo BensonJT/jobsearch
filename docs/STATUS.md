@@ -49,6 +49,34 @@ wants stretch-graded rows as the hard negatives. That is the user's call.
 
 **Push state:** `72167e5` and `e8431f9` are local, unpushed. The push go-ahead was given before the crash; ask again.
 
+## QUEUED — a level ceiling in the rule engine (raised 2026-09-16 during the user's report review)
+**Why.** Reviewing `Report_Feedback_20260916.csv`, the user found most of his `wrong` calls were about **level and
+scope**, not function: AVP / Senior Director postings well above any role he has held, usually bundled with deep
+industry tenure. Of the ten rows he had marked `wrong`, only three were about the work. The screen has the
+defect in the opposite direction: senior signals **award** level points with no ceiling (§14: senior = 100),
+which is a large part of why 170 of the 232 surfaced rows landed `very_strong`.
+
+**Decision (with the user).** Level is written plainly in the JD, so it gets a **deterministic rule, not a trained
+model** — the fit model is deliberately blind to level words (§13 `MODEL_STOP_WORDS`) and cannot learn it anyway.
+Human labels are the rule's **test set**, not training data.
+
+**Signals for the rule** (Required block and title): title tier AVP / VP / SVP / Head of / Chief / Senior Director;
+"N years managerial / people leadership" requirements; org-building language ("build and lead a … organization",
+"global teams", "spans of control", "executive candidate"); team size above `MAX_DIRECT_REPORTS`; P&L ownership.
+Several hits → `out_of_reach`, one → `stretch_up`, none → `in_range`. Worked example: Amgen "Associate Vice
+President, AI&D Scaled Operations and Transformation" hits title, 7 yrs managerial, org-building and spans of control.
+Note the nuance there: the written minimums ("Master's + 10 yrs", "7 yrs managerial **or** leading programs /
+directing resources") are nearly met — the reach problem is the org-building scope, not the stated minimums.
+
+**Schema.** `report_feedback` gains `level_fit` (the human label; already added to the vault CSV as column L, along
+with `grade_before_split`, `needs_confirm`, `split_reason`). `screens` gains a computed `level_fit` from the rule.
+Then measure rule-vs-human agreement, and only after that change how level feeds the score.
+
+**Grading convention the user adopted with it.** `human_grade` = is this my kind of work, ignoring level and
+industry; count the distinct kinds of work never owned: none = bullseye, one = adjacent, two or more with real
+overlap = stretch, almost none = wrong. Scale goes in `level_fit`, gates and logistics in `verdict`.
+Content not read or posting dead → grade blank.
+
 ## Where this left off
 
 Nine commits, **local and unpushed**, and one of them is a **history rewrite that must be force-pushed**
