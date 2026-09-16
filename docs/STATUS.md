@@ -139,20 +139,38 @@ reads. The full rescreen with both lens models ran 607 s against 456 s without t
 
 **Both thresholds are calibrated, as SQL macros so the views and the CLI read one source.**
 
-- `lens_strong_p()` = **0.70**, deliberately above the best-F1 point (0.58). These rows go in a list a
-  human reads, so precision beats recall: process P 0.97 / R 0.83, technical P 0.92 / R 0.83.
-- **There is no model bullseye.** Asked to reproduce the judge's bullseye/adjacent split the models
-  manage F1 0.64 / 0.61 at precision ~0.5 — a coin flip — because the probabilities overlap almost
-  completely (process means 0.886 bullseye vs 0.783 adjacent). So an ungraded row earns the `both`
-  bucket by clearing `lens_standout_p()` = **0.80** on a lens instead of being handed a grade the model
-  cannot predict. Decision 1 of §18.7 (`both` needs more than adjacent/adjacent) survives either way.
+**Correction, same session.** The first calibration scored the graded rows with a model trained on
+them and quoted P 0.97 / R 0.83 at 0.70. That is in-sample and not evidence. Out of fold the same
+threshold is **P 0.87 / R 0.61** (process) and **P 0.79 / R 0.55** (technical). The rule: a model's
+numbers on its own training set are never quoted — run `cross_validate` or say nothing.
 
-Mean probability by grade, on the 2,953 graded rows:
+**The overnight per-lens training result stands and reproduces.** OOF mean probability by grade:
 
-| | bullseye | adjacent | stretch | wrong |
-|---|---|---|---|---|
-| process | 0.886 | 0.783 | 0.435 | 0.159 |
-| technical | 0.892 | 0.785 | 0.386 | 0.149 |
+| | bullseye | adjacent | stretch | wrong | AUC |
+|---|---|---|---|---|---|
+| process | 0.797 | 0.678 | 0.509 | 0.217 | 0.951 |
+| technical | 0.784 | 0.634 | 0.430 | 0.192 | 0.950 |
+
+Monotonic across all four grades on both lenses — the levels ARE distinguished, which is what the
+two-lens retrain was for.
+
+**What the models do and do not do, measured separately:**
+- **strong vs not-strong: AUC 0.924 / 0.918.** Strong. This is what the lists rely on.
+- **bullseye vs adjacent: AUC 0.676 / 0.696.** Weak but real — better than chance, not usable as a
+  grade. The distributions overlap heavily (bullseye 0.797 ± 0.18 against adjacent 0.678 ± 0.21).
+  An earlier note in this file called it "a coin flip"; that was wrong, and it came from reading a
+  precision figure that is depressed by the class imbalance (358 bullseye against 641 adjacent)
+  rather than an AUC.
+
+So an ungraded row is never handed a predicted bullseye. It earns `both` by clearing
+`lens_standout_p()` = **0.80**, a probability statement the models can support, and that bar is
+understood to be soft. Decision 1 of §18.7 (`both` needs more than adjacent/adjacent) survives.
+
+`lens_strong_p()` stays at **0.70**. The bucket counts barely move between 0.60 and 0.70 (`both`
+208 -> 200, `process` 574 -> 540) because almost nothing in the surviving set sits near the
+boundary, so the correction changes the confidence attached to a `model` row, not which rows appear.
+If the `both` list wants tightening, the lever that actually bites is requiring the standout bar on
+**both** lenses rather than either: that takes `both` from 206 to **48**.
 
 ## 4. The three lens lists
 `finder.py lenses` writes `Lens_Lists_YYYYMMDD_HHMM.md` to the vault's `Search_Results`. Buckets are
