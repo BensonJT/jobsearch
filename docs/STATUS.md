@@ -31,8 +31,7 @@ Test count is **128**. `a10896a`'s message says 134; that number is wrong and 12
    test but nothing was ingested, so roughly 760 previously-unreachable reqs are still outside the corpus.
    The next `sweep_ats.py` picks them up and will need JD budget for them.
 4. **Still queued, untouched:** the "rules reject but model confident" review queue; a SuccessFactors
-   adapter; near-duplicate req dedupe; VACUUM / defrag (the file is ~1.4 GB and DuckDB does not shrink in
-   place — it needs `ATTACH` a fresh file plus `COPY FROM DATABASE`, not a `VACUUM` statement).
+   adapter; near-duplicate req dedupe.
 5. **`pipeline.combine` blend weights** (sprint plan 18.9, last open box): content sits at 0.90 from the
    single model; a two-lens content score may want its own blend. The lens scores are deliberately inert
    until that is decided.
@@ -179,6 +178,19 @@ Value Creation" (98); McKesson "Senior Financial Analyst, Transformation and Val
 bullseye/**bullseye**). Best model-only finds, none of which the judge has read: GE Vernova "Services AI
 Portfolio and Governance Leader" (94, p0.99/t0.89), Microsoft "Program Manager, Analytics" (91,
 p0.92/t0.99), Autodesk "Data Scientist, FP&A Solutions" (93, t0.98).
+
+## The defrag is done — 1,359 MB -> 650 MB
+DuckDB has **no in-place `VACUUM`**: deleted pages are reused, never returned to the filesystem. The
+reclaim is `ATTACH` a fresh file plus `COPY FROM DATABASE`, which took 27 s and gave back **709 MB**,
+far more than the ~100 MB expected from the day's deletes.
+
+Verified before the swap: all 20 tables, 553,057 rows, counts identical on both sides. Then
+`store.connect()` on the new file to reassert views and macros — schema v8, 63,453 active postings,
+373,163 screen rows, the lens macros and `vw_lens_fit` all intact.
+
+The pre-swap file is kept as **`db/jobsearch.duckdb.precompact-20260916`** (1.36 GB). Delete it once a
+sweep has run clean. Two other stale files are still sitting there: `finder_scratch.duckdb` (1.1 GB) and
+`jobsearch.duckdb.v1-backup-20260915` (68 MB).
 
 ## The rescreen trap (established 2026-09-16, worth not re-learning)
 `sweep.run` calls `pipeline.daily(since=stats["started"])`, and `_candidate_sql` ANDs that on top of
