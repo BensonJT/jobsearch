@@ -76,6 +76,90 @@ positive. If you would rather it were contested-and-excluded, that is
 `finder.py judge exclude --posting <id> --reason ...`. Angi and Zillow needed no action — their
 user-adjudicated `wrong` rows correctly beat their vault positives.
 
+## Also done: the blend re-tuned to content 0.90, and the rubric's analytics cap removed
+
+### Level 1 was audited first, because the weight decision depends on it
+The gates hold. Recomputed over all 949 survivors: **zero location leaks** — remote 453 · nationwide/remote-
+unverified 372 · commutable hybrid 51 · commutable on-site 73, and nothing with 0 location points survives. Pay
+works (719 of 949 post a band; the $150K floor rejects correctly). Of the 88 bullseye/adjacent postings Level 1
+rejects, the causes are location 68 · outside the US 43 · junior level 16 — the gate doing its job. **Two soft
+spots:** 372 survivors (39%) are "nationwide, remote unverified" and survive on an assumption; 3 non-US rows
+(2 CA, 1 GB) plus 102 with no country code slipped the country rule.
+
+### The sweep (720 graded survivors, OUT-OF-FOLD fit)
+| content weight | AUC | P@20 | P@50 |
+|---|---|---|---|
+| 0.50 (was) | 0.537 | 0.85 | 0.84 |
+| 0.75 | 0.577 | 0.90 | 0.84 |
+| **0.90 (set)** | **0.589** | **0.90** | **0.90** |
+| 1.00 | 0.592 | 0.90 | 0.88 |
+
+Monotonic. Held at 0.90: 1.00 buys 0.003 AUC and 10% keeps a level/title tiebreaker among postings the gates
+let through. `rule_score` is unaffected — `profile_score` renormalizes over the non-content weights.
+`rules_version` **`a844b0d2d80d` → `2f74427157f8`**.
+
+**Rescreen: verdicts identical** (candidate 130 · review 819 · reject 79,323) — verdict comes from rule
+reasons, not the score. **Bands moved a lot**, which is the point: very_strong 123 → **189**, strong 358 → 241,
+partial 403 → 244, weak 65 → **269**. The distribution spread out instead of being dragged to the middle.
+
+| band | good-fit rate at w=0.50 | at w=0.90 |
+|---|---|---|
+| very_strong | 92% | **95%** (104 bullseye, 75 adjacent, 10 stretch, **0 wrong**) |
+| strong | 78% | **85%** |
+| partial | 33% | **43%** |
+| weak | 0% | **2%** (83 wrong, 43 stretch) |
+
+Named rows: Henry Schein R134977 **99** · Included Health Staffing Transformation **91** · Included Health
+Workforce Analytics Model Standardization **86** · Amentum Business Process Specialist **70** (strong) · Centene
+Medical Economics 88 (stretch, still high) · Humana Creative Ops 81. Report: `Jobs_Found_20260915_2235.md`.
+
+### The finding that matters more than the weight
+In-sample, fit AUC among survivors is 0.925. **Out-of-fold it is 0.592.** Mean OOF fit by grade, survivors only:
+bullseye **0.77** · adjacent **0.64** · stretch **0.65** · wrong **0.63**. The model separates bullseyes cleanly
+and **cannot tell stretch or wrong from adjacent** among postings that cleared Level 1. The retrain's real win is
+on the rejected population (OOF AUC 0.927) — it is excellent at discarding the obviously wrong. The confusable
+band is still confusable, and no weight change fixes that; Phase 3 coverage or Phase 4 LLM review has to.
+**Caveat that cuts the other way:** many of those unseparated `stretch` rows are analytics roles mislabelled by
+the rubric bug below, so part of this flatness may be label error, not model error.
+
+### The rubric bug: 0 of 3,009 postings could ever be a bullseye in the analytics lane
+`RUBRIC_PERSONAL` said *"SECONDARY lane (cap at `adjacent`): senior, strategic, leadership-facing data /
+analytics / BI work"* and gave the analytics record one clause: *"automating reporting pipelines in SQL and
+Python; Grafana, Plotly and Streamlit dashboards."* Consequence, measured: **bullseye by lane = primary 208,
+secondary 0.** The cap was structurally binding on 247 secondary-lane rows.
+
+It also cost real grades. Capital One "Principal Associate, Financial Planning & Analysis" → `stretch`:
+*"the core work is corporate FP&A, **a distinct finance discipline**"* — the judge called FP&A unfamiliar work
+because the record it was shown does not contain FP&A.
+
+**Rewritten from the §5 evidence sources** (`Resume_Bullets.csv`, `Resume_Blocks.csv`, `Bio_Jeff_Professional.md`),
+adding what was verifiably missing: the Force-to-Load capacity model (1,000-person field force, demand by day /
+hour / shift, $18-22M capacity variance, work priced in minutes with a modified PERT distribution, four versions
+in three years); the five-year FWA truck-roll forecast model (**FWA = Fixed Wireless Access, not fraud/waste/
+abuse**); FP&A forecasting and budget management ($3B demand vs $2.2B budget, Commitment View and Best View,
+DMAIC cycle-time cut of 70%); production data pipelines (Python/SQL over Oracle milestone tables with automated
+SPC charts replacing Minitab, the data architecture a data science team trained a prediction model on, a
+self-healing 12-source pipeline into PostgreSQL). The blanket cap is replaced by a rule that judges **the object
+of the analysis**: operations decisions (capacity, workforce, demand, throughput, forecasting, cost-to-serve) can
+be `bullseye`; other objects (marketing, product, risk) are `adjacent`; hands-on engineering IC seats (data
+engineer, analytics engineer, data scientist building ML/NLP/RAG) stay `wrong`. `rubric_version`
+**`645584b0771e` → `5f0f1755634b`**. Old file backed up outside the repo.
+
+**On the coding-assessment constraint — corrected mid-session.** The first argument for dropping it from the
+rubric was that Level 1 owns it. That over-claimed: `ASSESSMENT_GATE_TERMS` and `CODING_TEST_TERMS` only catch
+JDs that *say so* (and the coding rule only on tier 3), and `BLOCKED_POSTERS` is a short named list (Crossover).
+Most postings that will have an assessment do not mention one. **It still does not belong in the rubric**, for a
+better reason: the judge reading the JD has exactly the same information as the regex and cannot predict it
+either. The cap was not detecting assessment risk — it was using "is this an analytics role" as a proxy for it,
+and that proxy is what killed the workforce-analytics roles the user wants. Assessment risk is discovered, not
+predicted; it belongs in `BLOCKED_POSTERS` as it is learned, and in the user's judgement at application time.
+
+### NOT DONE — needs the user's go-ahead
+**The re-grade.** The labels in the DB still carry the cap. Scope: the 247 secondary-lane rows plus the ~368
+analytics-flavoured `wrong` rows ≈ **600 postings, ~24 batches, ~1.7M tokens**. Every crosstab above is measured
+against the OLD labels, so the true picture may be better than reported. `judge export` renumbers batches, so
+re-export against `5f0f1755634b` before grading.
+
 ## NEXT SESSION: START HERE
 1. **Re-tune `pipeline.combine`.** blend AUC 0.814 < fit AUC 0.941 means the blend is now *destroying* signal.
    The weights assume a weak fit model that no longer exists. Highest value, smallest change — same shape as
