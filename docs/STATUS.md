@@ -1,49 +1,184 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-16 (Claude Code / Opus, day session). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-16 (Claude Code / Opus, afternoon session). Overwrite at the end of each session; git history is the changelog._
 
 ## Where this left off
 
-Five commits, **local and unpushed**. The corpus is US-only, the ingestion bug that was silently
-throwing away most of four boards is fixed, both per-lens models are trained, and a user ruling
-unblocked ~6,000 postings that a bad clearance rule had flagged away.
+Nine commits, **local and unpushed**, and one of them is a **history rewrite that must be force-pushed**
+(see "Personal data was live on the public remote" below — do this first).
 
-**Nothing has been rescreened yet.** `rules_version` moved `2f74427157f8` -> `287640fe1817` (the
-clearance fix), so every score in `screens` is stale with respect to the current rules. A normal
-sweep will NOT propagate that -- see "the rescreen trap" below.
+The four queued items are done: the corpus is rescreened under current rules, the three clamped boards
+enumerate fully, every row carries a per-lens fit, and the three lens lists are written and waiting for
+review.
 
 | commit | what |
 |---|---|
-| `8ea32db` | Workday CXS clamps `total` at 2000: detect, scope to US, never close-pass |
-| `ff691c7` | A fit model per lens (18.8) |
-| `3ac4b51` | `board_facets` discovery; clamp detector corrected to a single-valued facet |
-| `740c9a7` | Clearance is a blocker only when it must already be HELD |
-| `01301c1` | Plan executor + facet key fix + live scope verification |
-| `a797478` | Domain tenure: a disjunctive list naming a field he has is not a gate |
+| `ba6a327` | **Rewrite of `9ab7755`** with the compensation figures removed from this file |
+| `ce151f1` | A flag that says "this is reachable" must not cost points |
+| `461d4b7` | Partition plan builder: enumerate a clamped board one facet value at a time |
+| `a10896a` | Per-lens fit on every row: `screens.fit_process` / `fit_technical`, `vw_lens_fit` |
+| `22f0ac1` | The three lens lists, and two CLI commands that were documented but never built |
+
+Test count is **128**. `a10896a`'s message says 134; that number is wrong and 128 is the real one.
 
 ## NEXT SESSION: START HERE
-1. **`rescreen-all`** -- the clearance fix reaches nothing until this runs. Expect ~6,000 postings to
-   lose the "unreachable" flag and a batch of federal-contractor roles to surface (CACI "Business
-   Process Consultant" 93, Guidehouse "Senior Business Process Analyst" 91 were both flagged away).
-2. **Partition strategy** for the three boards that are clamped with no country facet -- Booz Allen,
-   Leidos, Sentara. Booz Allen's job families are 1,172 / 766 / 445, each under the 2,000 ceiling, so
-   it is fully enumerable. The plan executor already supports `partition`; only the plan *builder*
-   and the completeness assertion are missing.
-   **Acceptance test that is now possible:** after a partitioned pull, assert the union size matches
-   the board's `timeType` sum (Booz Allen 2,386). If it comes back 2,000 the partition did not work.
-3. **`screens.fit_process` / `fit_technical`** -- schema, scoring in `pipeline.screen`, then a full
-   rescreen so all 66k rows carry a lens prediction.
-4. **Then the three report lists** (strong process / strong technical / both) with a `lens_source`
-   column marking whether each row was placed by the user, the judge, or the model.
-5. **VACUUM / defrag** -- the user asked for this; 22,660 postings and 82,734 screen rows were
-   deleted today and the file is still ~1.36 GB.
-6. **Pending user decision:** record a `user-adjudicated` label on Guidehouse "Senior Business
-   Analyst" (see "judge variance" below). He ruled `adjacent`, not bullseye. **He is building an
-   adjudication file of his own -- wait for it before touching adjudication.**
-7. **Proposed, not built: a "rules reject but model confident" review queue.** Three rules bugs were
-   found today *only* because the user checked reqs by hand. The Bausch + Lomb Director below is
-   `reject` by rules and 0.99+ on both lens models, and that contradiction is currently discarded
-   silently. Surfacing it is better than loosening rules that are right 7 times in 8.
+1. **Force-push.** `ba6a327` replaces `9ab7755`; until it lands, the comp anchor is still on the public
+   remote. `git push --force-with-lease origin main`. Then reset the OptiPlex mirror rather than merging
+   into it — its history diverged.
+2. **Review `Lens_Lists_20260916_1343.md`** in the vault's `Search_Results`. 200 `both`, 540 `process`,
+   222 `technical` actionable. The top of the `both` list is the point of the whole two-lens exercise.
+3. **A sweep has not run since the partition landed.** The three boards were pulled live as an acceptance
+   test but nothing was ingested, so roughly 760 previously-unreachable reqs are still outside the corpus.
+   The next `sweep_ats.py` picks them up and will need JD budget for them.
+4. **Still queued, untouched:** the "rules reject but model confident" review queue; a SuccessFactors
+   adapter; near-duplicate req dedupe; VACUUM / defrag (the file is ~1.4 GB and DuckDB does not shrink in
+   place — it needs `ATTACH` a fresh file plus `COPY FROM DATABASE`, not a `VACUUM` statement).
+5. **`pipeline.combine` blend weights** (sprint plan 18.9, last open box): content sits at 0.90 from the
+   single model; a two-lens content score may want its own blend. The lens scores are deliberately inert
+   until that is decided.
+6. **Adjudication is still the user's.** He is writing an adjudication file himself. Do not record
+   `user-adjudicated` labels ahead of it.
+
+## Personal data was live on the public remote (2026-09-16, resolved pending a push)
+`git ls-remote` confirmed `9ab7755` was on `origin/main`, and its `docs/STATUS.md` carried the
+compensation anchor and a posted band verbatim, in the Bausch + Lomb comparison table. Both numbers
+are in `.personal_patterns`; the repo's own pre-commit scan was never run on that commit. **The
+figures are deliberately not repeated here — they live in the vault.**
+
+They appear in **that commit only**, so the fix is one rewrite: `ba6a327` is `9ab7755` with the line
+redacted. **User's ruling: scrub the comp figure only.**
+
+**The scan is not expected to come back empty.** Two other patterns — a clearance level and a first
+name — still match at `backend/profile.py:111` and `tests/test_finder.py:1261-1262`, and they go back
+to `32d38d8`. The user decided they stay: far less sensitive on a repo already under his own name.
+**That is the baseline — two files, three lines. Anything else the scan prints is new and must be
+dealt with before committing.**
+
+`refs/remotes/origin/main` is now the only ref holding the old commit. The force-push removes it.
+
+**Run the scan before every commit — including on this file.** It is one line, it was skipped on
+`9ab7755`, and writing up the incident is itself a way to reintroduce the very strings it is about.
+```bash
+git grep --untracked -n -i -E -f .personal_patterns -- . ':!.personal_patterns' ':!LICENSE'
+```
+
+## 1. The clearance ruling only worked after a SECOND fix
+The first `rescreen-all` propagated the clearance and domain-tenure rules to all 63,453 active rows
+(456 s) and the verdict diff was **+7 candidate / −7 review / +15 reject**. Nothing like the "batch of
+federal-contractor roles surfacing" the last handoff predicted.
+
+Two things were wrong with that prediction, and both are worth keeping:
+
+**Clearance has only ever been a flag, never a rejection.** CACI "Business Process Consultant" (93) and
+Guidehouse "Senior Business Process Analyst" (91) were never flagged away — they were already sitting at
+`review` with those exact scores. A verdict-count diff is the wrong instrument for a flag change.
+
+**The reclassification worked; the scoring did not.** Measured old-rules vs new over the same 63,438 rows:
+
+| | before | after |
+|---|---|---|
+| blanket "likely unreachable" flag | 11,351 | — |
+| "must already be held -- likely unreachable" | — | 5,340 |
+| "is sponsored (ability to obtain) -- reachable" | — | 3,858 |
+| no clearance flag at all (boilerplate) | — | 2,153 dropped |
+| domain-tenure flag | 1,194 | 1,035 |
+
+So **6,011 postings were correctly reclassified — and only 52 rows moved score**, because the new
+"reachable" flag was still penalized 5 points exactly like the flag it replaced. 3,858 postings traded
+one penalty for another, and the remaining ~62k are `reject`, which scores 0 regardless.
+
+`^clearance is sponsored` is now in `UNPENALIZED_FLAG_PATTERNS` (`ce151f1`). After the second rescreen
+(607 s, rules `16fa57dbeded`) the ruling finally pays: **132 non-rejected postings gained 5 points**,
+14 moved `strong` -> `very_strong`, and the federal-contractor roles surfaced as predicted —
+
+| posting | before | after |
+|---|---|---|
+| CACI "Business Process Consultant" | 93 | **98** |
+| Guidehouse "Senior Business Process Analyst" | 91 | **96** |
+| Guidehouse "Senior Financial Transformation Consultant" | 89 | **94** |
+| CACI "Process Specialist" | 88 | 93 |
+| Guidehouse "Change Management / Communication Lead" | 86 | 91 |
+
+**Generalize this.** A flag whose text says the thing is *fine* must be in `UNPENALIZED_FLAG_PATTERNS`,
+or splitting a bad flag into a good one and a bad one buys nothing.
+
+## 2. Partition: the three clamped boards now enumerate fully
+`facets.resolve_partition` builds the plan; the executor already ran it. A facet qualifies only when it
+is **flat** (its parameter is the filter key — a nested location group answers HTTP 400), every value is
+under the 2,000 ceiling, and its counts **sum to the board's `timeType` total**. That sum is the only
+evidence the facet is single-valued AND covers every posting: a multi-valued facet sums over it, an
+incomplete one sums under it.
+
+**It takes the smallest largest-value, not the fewest pulls.** Leidos offers `Is_Evergreen` (2 pulls,
+largest 1,863 — 137 reqs from clamping again) and `jobFamilyGroup` (27 pulls, largest 917). Headroom is
+worth 25 extra pulls. Sentara has no choice: only `timeType` covers it, largest 1,727.
+
+| board | ceiling said | really has | facet | pulls | largest | result |
+|---|---|---|---|---|---|---|
+| Booz Allen | 2,000 | 2,396 | `jobFamilyGroup` | 4 | 1,177 | 2,396 pulled, close-pass OK |
+| Leidos | 2,000 | 2,210 | `jobFamilyGroup` | 27 | 917 | 2,209 pulled, close-pass OK |
+| Sentara | 2,000 | 2,157 | `timeType` | 3 | 1,727 | 2,155 pulled, close-pass OK |
+
+**The build-time sum test is necessary but not sufficient, so the pull re-checks itself.** The first
+acceptance run came back 2,392 of 2,394 on Booz Allen and correctly refused the close-pass. That was
+not a coverage gap — the board moved to 2,396 during the 100-second pull. So `workday_jobs` now probes
+the true total **before and after** and forgives a shortfall only up to the churn it measured. A gap
+larger than the churn still marks the pull truncated, because closing reqs a bad facet never looked at
+is the 1,380-false-takedown bug again.
+
+`finder.py facets [--discover]` now exists. `store.py` had claimed since the table was added that
+discovery is "captured by `finder.py facets --discover`"; it never was — the last session ran it by hand.
+
+## 3. Per-lens fit on the whole corpus (sprint plan 18.8, done)
+Schema **v8**, additive: `screens.fit_process` / `fit_technical`. Filled on **60,391** active rows —
+every row that has JD text. Stored and reported **only**: `combine` does not read them, so `final_score`
+and `model_version` are unchanged.
+
+`lens_scores` computes probabilities with no term attribution. Explaining a score is the main model's
+job; per-row attribution for two more models triples the expensive half of the screen for output nobody
+reads. The full rescreen with both lens models ran 607 s against 456 s without them.
+
+**Both thresholds are calibrated, as SQL macros so the views and the CLI read one source.**
+
+- `lens_strong_p()` = **0.70**, deliberately above the best-F1 point (0.58). These rows go in a list a
+  human reads, so precision beats recall: process P 0.97 / R 0.83, technical P 0.92 / R 0.83.
+- **There is no model bullseye.** Asked to reproduce the judge's bullseye/adjacent split the models
+  manage F1 0.64 / 0.61 at precision ~0.5 — a coin flip — because the probabilities overlap almost
+  completely (process means 0.886 bullseye vs 0.783 adjacent). So an ungraded row earns the `both`
+  bucket by clearing `lens_standout_p()` = **0.80** on a lens instead of being handed a grade the model
+  cannot predict. Decision 1 of §18.7 (`both` needs more than adjacent/adjacent) survives either way.
+
+Mean probability by grade, on the 2,953 graded rows:
+
+| | bullseye | adjacent | stretch | wrong |
+|---|---|---|---|---|
+| process | 0.886 | 0.783 | 0.435 | 0.159 |
+| technical | 0.892 | 0.785 | 0.386 | 0.149 |
+
+## 4. The three lens lists
+`finder.py lenses` writes `Lens_Lists_YYYYMMDD_HHMM.md` to the vault's `Search_Results`. Buckets are
+disjoint and each is ranked separately (§18.9: do not merge them into one ordering).
+
+| lens_source | both | process | technical | neither | total |
+|---|---|---|---|---|---|
+| user | 1 | 0 | 1 | 1 | 3 |
+| judge | 234 | 749 | 290 | 1,589 | 2,862 |
+| model | 366 | 875 | 528 | 58,819 | 60,588 |
+
+Actionable (not `reject`, not decided, not in the tracker): **both 200 · process 540 · technical 222**.
+`judge+model` came out empty, which confirms the re-grade covered both lenses on every judged row.
+
+**Lists rank on `final_score`, with `lens_source` only breaking a tie.** Sorting by evidence weight
+would bury a model row at 92 under a judged row at 55, and the point of scoring the whole corpus was to
+stop the judged 3k being the only thing visible. The lens cells print the judge's word where there is
+one and `~0.83` where there is not, so the two are never confused.
+
+Top of the `both` list: Henry Schein "Senior Manager, AI Transformation & Process Excellence" (99,
+bullseye/adjacent, $114–178K, remote, 2 days old); Humana "AVP, Corporate Development Integration &
+Value Creation" (98); McKesson "Senior Financial Analyst, Transformation and Value Realization" (97,
+bullseye/**bullseye**). Best model-only finds, none of which the judge has read: GE Vernova "Services AI
+Portfolio and Governance Leader" (94, p0.99/t0.89), Microsoft "Program Manager, Analytics" (91,
+p0.92/t0.99), Autodesk "Data Scientist, FP&A Solutions" (93, t0.98).
 
 ## The rescreen trap (established 2026-09-16, worth not re-learning)
 `sweep.run` calls `pipeline.daily(since=stats["started"])`, and `_candidate_sql` ANDs that on top of
@@ -53,193 +188,74 @@ the rescreen predicate:
 AND (p.first_seen_at >= ? OR p.description_fetched_at >= ?)
 ```
 
-So on a routine sweep, `rules_version != ?` / `model_version != ?` are **necessary but not
-sufficient** -- the row must also have been first seen or re-fetched in that run. New reqs and
-changed JDs get the new rules/model; the rest of the corpus keeps its old scores, silently, with no
-error. **After any rules or model change, run `rescreen-all` explicitly.**
-
-Changed JD text *is* handled automatically: the upsert bumps `description_fetched_at` only when the
-text actually differs, and the screen stage runs after the detail stage.
-
-## Sweep run `bd57bcfd` (2026-09-16, 22.0 min)
-137 boards ok, 0 failed, 84,112 live, **7,888 new**, 22 reopened, 4,453 taken down, 5,281 JDs fetched.
-Screen: 7,942 rows -> 16 candidate / 68 review.
-
-**1,380 of those take-downs were false** and have been reopened (ids snapshotted outside the repo).
-They came from the four clamped boards. One was verified still live on the ATS: Accenture
-"Consulting Advanced Degree Consultant - Health" (`strong`, 70). Leidos "Program Financial Analyst V"
-(`very_strong`, 87) was a genuine 404. Four Booz Allen rows are unresolved -- the API answers 403
-(WAF) and the public page is an SPA shell, so neither proves anything.
+So on a routine sweep, `rules_version != ?` / `model_version != ?` are **necessary but not sufficient**
+— the row must also have been first seen or re-fetched in that run. **After any rules or model change,
+run `rescreen-all` explicitly.** Changed JD text is handled automatically: the upsert bumps
+`description_fetched_at` only when the text actually differs, and the screen stage runs after detail.
 
 ## The Workday `total` clamp
-Accenture reports `total=2000` against a real count of ~44,187. We were ingesting **4.5%** of the
-board and close-passing the rest as taken down. Offsets past the ceiling return page 1 again, so
-there is no paginating around it.
+Accenture reports `total=2000` against a real count of ~44,187. Detection must use a **single-valued**
+facet: a posting in three cities counts three times in the location facet and `workerSubType` is
+multi-valued too, which called Autodesk and Guidehouse clamped when both are complete. `timeType` is one
+value per posting. **Probing past the ceiling is NOT a usable test** — Workday answers any out-of-range
+offset with page 1, so even a genuine board looks like it has more.
 
-**Detection must use a SINGLE-VALUED facet.** The first attempt compared `total` against the widest
-facet sum, which is wrong: a posting in three cities counts three times in the location facet, and
-`workerSubType` is multi-valued too (Accenture 86,767 against 44,187 postings). That called Autodesk
-(405) and Guidehouse (757) clamped when both are complete. `timeType` is one value per posting:
-
-| board | total | timeType | ratio | verdict |
-|---|---|---|---|---|
-| Accenture | 2,000 | 44,216 | 22.11 | clamped |
-| Booz Allen | 2,000 | 2,386 | 1.19 | clamped |
-| Leidos | 2,000 | 2,192 | 1.10 | clamped |
-| Henry Schein / Autodesk / Guidehouse / GE Vernova | — | — | 1.00 | genuine |
-
-**Probing past the ceiling is NOT a usable test** -- Workday answers any out-of-range offset with
-page 1, so even a genuine board looks like it has more. Do not re-try that approach.
+Accenture stays on `country` (44,216 -> ~731 US). Its US facet is applied and verified; the three boards
+above expose no country facet at all, which is why they needed a partition.
 
 ## `board_facets` / `board_scope` and the plan executor
-Ask each board what it can filter by; never hardcode a facet id. Two tables: `board_facets` (every
-facet parameter, nested group, value id, descriptor, count) and `board_scope` (the resolved
-strategy). `backend/ats/facets.py` discovers and resolves; `finder`/sweep passes the scope into
-`adapters.list_jobs(row, scope=...)`.
+Ask each board what it can filter by; never hardcode a facet id. `plain` = one unfiltered pull,
+`country` = one filtered pull, `partition` = one pull per facet value unioned on the req key,
+`truncate` = pull what we can and block the close-pass.
 
-**The pull is a plan executor**, so every strategy is one code path with a different plan:
-`plain` = one unfiltered pull, `country` = one filtered pull, `partition` = one pull per facet value
-unioned on the req key, `truncate` = pull what we can and block the close-pass. Adding `partition`
-is a plan *builder*, not a new pull mechanism.
+**Three tenant behaviours, and only a live probe tells them apart:** applied correctly (Accenture);
+rejected with HTTP 400 (Booz Allen, Sentara); accepted and silently ignored (GE Vernova returned an
+unchanged total and French locations). `discover_and_record` probes every resolved scope for real,
+country or partition, and discards what does not actually filter.
 
-**Three tenant behaviours, and only a live probe tells them apart:**
-- applied correctly (Accenture)
-- rejected with HTTP 400 (Booz Allen, Sentara -- they expose no country facet at all, only a flat
-  city list)
-- **accepted and silently ignored** (GE Vernova returned an unchanged total and French locations)
+**The filter key is not the tree's parameter name.** Workday nests countries under `locationMainGroup`
+-> "Country" but you filter on **`locationCountry`**. US matching is by **exact descriptor** — `"United"`
+also matches United Kingdom and United Arab Emirates.
 
-So `verify_scope` applies the facet for real and keeps it only when the total actually drops.
+## Judge variance is real
+Guidehouse posts the same "Senior Business Analyst" as reqs 43463 and 43549, **99.994% identical text**,
+graded `stretch`/`adjacent` overall and `adjacent`/`bullseye` on the process lens. The model scored both
+identically. So "the same JD and rubric produce the same grade" is **false**, and re-grading is not pure
+waste. Across 85 near-duplicate graded groups, 21 (25%) show the judge disagreeing with itself — an
+upper bound, since same employer/title/pay does not guarantee identical text.
 
-**The filter key is not the tree's parameter name.** Workday nests countries under
-`locationMainGroup` -> "Country", but you filter on **`locationCountry`**. Filtering on
-`locationMainGroup` answers HTTP 400. Tenants exposing a top-level country parameter
-(`Location_Country`, `LocationCountry`, a custom `CF_-_REC_-_...` field) use that name directly.
+The user adjudicated that pair himself and sided with the **lower** grade: strong process components, but
+the role is heavy on requirements documentation and user stories, which he has not done much of outside
+~1 year as a scrum master. Related record gap: he *is* writing product requirements now — Forester,
+Meridian, jobsearch — and none of it is in the evidence the judge reads.
 
-US matching is by **exact descriptor**, never substring: `"United"` also matches United Kingdom and
-United Arab Emirates, both live in Accenture's own country list.
+## Three rules bugs, all found by the user checking reqs by hand — plus a fourth found by measuring
+1. **Clearance** (`740c9a7`) — ~6,000 postings mis-flagged.
+2. **Domain tenure** (`a797478`) — a disjunctive list naming a field he has is not a gate.
+3. **Not fixed, deliberately:** `off-function title` and `sales/revenue ops scope`. All 5 active
+   "excellence"-titled postings hitting the first are genuinely off-lane, and 7 of 8 hitting the second
+   are genuinely sales/BD. The review queue is the fix, not loosening rules that are right 7 times in 8.
+4. **The penalty on the new "reachable" flag** (`ce151f1`) — found only by diffing the rescreen instead
+   of trusting the verdict counts. See §1.
 
-## The corpus is US-only now
-**22,660 non-US postings and 82,734 screen rows deleted** (101 MB of JD text). 88,947 -> 66,287.
+**The pattern: three of four were invisible until someone checked the output against the world.** The
+"rules reject but model confident" review queue is still the right next build — the Bausch + Lomb
+Director is `reject` by rules and 0.99+ on both lens models, and that contradiction is discarded
+silently.
 
-Guarded: anything carrying an LLM grade, a decision or a `label_docs` row survived (710 rows),
-preserving **823 graded labels including 25 process-bullseye and 61 process-adjacent**. NULL-country
-rows (8,216) were left alone -- unknown is not non-US. Identifiers backed up outside the repo.
-
-Accenture's board is 86% India (38,911 of 45,219); US is genuinely ~731. That is where the deleted
-volume came from, and the `country` strategy is what stops it coming back.
-
-**SQL trap:** the first delete predicate used `NOT IN (SELECT posting_id FROM tracker)` and **all 336
-tracker rows have NULL `posting_id`**, which makes `NOT IN` return zero rows for everything. Use
-`NOT EXISTS`. Also note the tracker matches by fuzzy name, not posting id, so it guards nothing --
-`llm_labels` and `decisions` are what actually protect the user's history.
-
-## Per-lens fit models (sprint plan 18.8) -- zero tokens, trained from existing labels
-`vw_label_set_process` / `vw_label_set_technical` mirror `vw_label_set` but carry that lens's grade
-and admit only rows judged on it. Shared sources (vault documents, decisions) stay in both: they
-describe the candidate, not a lens. `train(lens=)` stores under `kind='tfidf_lr_<lens>'`;
-`latest_row(lens=)` asks for one by name.
-
-| | process `c80d6fb39bc7` | technical `3fee819b2a64` |
-|---|---|---|
-| pos / neg | 1,358 / 3,411 | 985 / 3,784 |
-| CV AUC | 0.951 | 0.951 |
-| P@20 | 1.00 | 0.98 |
-| bullseye/adjacent/stretch/wrong | .80 / .68 / .51 / .22 | .79 / .64 / .43 / .19 |
-
-The real evidence is the vocabularies, which came out genuinely distinct: process leads with
-project / governance / change management / transformation; technical with analytics / finance /
-dashboards / forecasting / bi. `auc_vs_stretch` (0.776 / 0.794) is NOT comparable to the single
-model's 0.836 -- each is judged against its own lens's labels.
-
-## Clearance: held vs obtainable (user ruling, high impact)
-> "Any req that has the word OBTAIN means they might be willing to pay for it and fund it so that is
-> NOT a blocker. But if they require it be possessed already and active that is the blocker."
-
-He held a federal Public Trust in 2021. Measured over the 11,325 postings carrying the old flag:
-**5,300** require a held or unsponsored hard clearance, **3,859** say "ability to obtain", and
-**2,165** matched nothing but a compensation paragraph (*"...skill sets, experience, security
-clearances, licensure..."*). So ~6,000 were flagged away over language that is not a requirement.
-
-It was costing exactly his lane: CACI "Business Process Consultant" (93), Guidehouse "Senior Business
-Process Analyst" (91), "Senior Financial Transformation Consultant" (89), "Business Process Analyst
-(Finance)" (86), "Change Management / Communication Lead" (86).
-
-Now: held/current language, or a hard level (TS/SCI, Top Secret, Secret, polygraph) with no offer to
-sponsor -> unreachable. "Ability to obtain" at **any** level -> reachable. Boilerplate -> nothing.
-
-## Judge variance is real -- correcting an earlier claim
-Guidehouse posts the same "Senior Business Analyst" as **two reqs, 43463 and 43549**, whose JDs are
-**99.994% identical (they differ by one period)**. Same rubric version, same scorer, different batch.
-They were graded differently:
-
-| | 43463 | 43549 |
-|---|---|---|
-| overall | stretch | adjacent |
-| process | adjacent | **bullseye** |
-| technical | wrong | stretch |
-
-The model scored both identically (70, fit 0.753) -- the variance is entirely in the judge. So
-"the same JD and rubric produce the same grade" is **false**, and re-grading is not pure waste.
-
-Across 85 near-duplicate graded groups (same employer + title + pay), **21 (25%) show the judge
-disagreeing with itself.** Caveat: same employer/title/pay does not guarantee identical text, so 25%
-is an upper bound; the Guidehouse pair is the clean proof.
-
-**The user adjudicated it himself and sided with the LOWER grade** (`adjacent`): the process
-components are strong, but the role is heavy on requirements documentation and user stories, which
-he has not done much of outside ~1 year as a scrum master. Worth recording as `user-adjudicated`.
-
-Related record gap: he *is* writing product requirements now -- Forester, Meridian, jobsearch, in
-agentic AI-assisted development -- and none of it is in the evidence the judge reads.
-
-Also: duplicate reqs are stored as separate postings, which inflates the corpus and splits their
-grades. Deduping near-identical JDs per employer is a small separate win.
-
-## Three rules bugs, all found by the user checking reqs by hand
-1. **Clearance** (fixed, `740c9a7`) -- ~6,000 postings mis-flagged. See above.
-2. **Domain tenure** (fixed, `a797478`) -- "10+ years in Supply Chain, Operations, Logistics,
-   Manufacturing, Consulting, or a related field" gates on none of them; the rule read the first
-   term and raised a gate. 193 of 1,194 flagged postings (16%) are this disjunctive shape. A real
-   disjunction (comma series or explicit "or") plus a `CANDIDATE_TENURE_FIELDS` match now clears it;
-   "10+ years in banking operations" is a compound domain and still gates.
-3. **Not fixed, deliberately:** `off-function title` (TITLE_FUNCTION_TERMS has process/operational/
-   business excellence but not bare "excellence") and `sales/revenue ops scope (opportunity
-   pipeline)` (a CI *transformation* opportunity pipeline, not a sales pipeline). Both rejected the
-   Bausch Director. **Checked and left alone:** all 5 active "excellence"-titled postings hitting
-   the first are genuinely off-lane (Sales Excellence Manager x3), and 7 of 8 hitting the second are
-   genuinely sales/BD. Loosening either costs more than it buys -- the review queue is the fix.
-
-## SuccessFactors IS ingestible (new platform, adapter not built)
-Bausch + Lomb. The generic host `career2.successfactors.eu` does **not** paginate -- `startrow` is
-ignored, there is no `_s.crb` token to borrow, and Imperva/Incapsula cookies are present. The
-**branded** host does: `https://careers.bauschlomb.com/search/?q=&sortColumn=referencedate&sortDirection=desc&startrow=N`
-returned rows 26-50 correctly and pulled **172 of 173** reqs. Detail pages work via the
-`/job/<slug>/<id>/` path on the branded host (the generic host needs
-`career?company=X&career_ns=job_listing&career_job_req_id=<id>`).
-
-So the rule for SuccessFactors is: **find the employer's branded career host, not the generic one.**
-Worth checking how many target employers sit on SuccessFactors before building the adapter --
-it is common in pharma and medical device.
-
-## Two Bausch + Lomb reqs scored by hand (not in the corpus -- no SF adapter yet)
-| | Director, SC Strategy & Excellence (1369185957) | Principal SC Data Engineer & Analytics Lead (1369446357) |
-|---|---|---|
-| comp | **above the anchor** (see the vault; figures stay out of this public repo) | below it |
-| process / technical fit | **0.994 / 0.995** | 0.936 / 0.999 |
-| rule_score / verdict | 93 / `reject` | 90 / `review` |
-| level detected | senior (10 yrs) | mid (5 yrs) |
-| blockers | **travel up to 50% vs his 25% ceiling** | Power BI / Tableau / Qlik required, none in the record |
-
-The Director is the better role on every axis except travel, which the user confirmed is a genuine
-problem. The suggested screen question is what the steady state looks like after the initial network
-assessment, rather than negotiating the posted number.
+## SuccessFactors IS ingestible (adapter not built)
+The generic host `career2.successfactors.eu` does not paginate. The **branded** host does:
+`https://careers.bauschlomb.com/search/?q=&sortColumn=referencedate&sortDirection=desc&startrow=N`
+pulled 172 of 173 reqs. Detail pages work via `/job/<slug>/<id>/` on the branded host. **The rule is:
+find the employer's branded career host, not the generic one.** Common in pharma and medical device —
+worth counting target employers on it before building.
 
 ## Carried over
-- SmartRecruiters / Workable JD backfill; daily schedule; long-tail adapters (iCIMS, Dayforce,
-  Radancy, BrassRing); registry "VERIFY" rows; aggregator keys.
+- SmartRecruiters / Workable JD backfill; daily schedule; long-tail adapters (iCIMS, Dayforce, Radancy,
+  BrassRing); registry "VERIFY" rows; aggregator keys.
 - Cleanup of `db/jobsearch.duckdb.v1-backup-20260915` and the history bundle.
-- Coverage/Phase 3b is still blocked and unchanged -- `vw_hard_negatives` can now draw on 1,361
-  graded `wrong` rows instead of 7 audited ones, so re-calibrate before deciding.
+- Coverage/Phase 3b still blocked; `vw_hard_negatives` can now draw on 1,361 graded `wrong` rows instead
+  of 7 audited ones, so re-calibrate before deciding.
 - `rubric_local.py` is gitignored; its backup is vault `Tools/Finder_Build_Personal_Appendix.md` §2,
   synced at `897123f3fc93`. Re-sync whenever the rubric changes.
 
@@ -247,5 +263,7 @@ assessment, rather than negotiating the posted number.
 ```bash
 .venv/bin/python -u sweep_ats.py                 # all stages; --no-report to skip the vault file
 .venv/bin/python finder.py rescreen-all          # REQUIRED after any rules/model change
-.venv/bin/python -m pytest -q                    # 103
+.venv/bin/python finder.py facets --discover     # re-resolve every board's filter scope
+.venv/bin/python finder.py lenses                # the three lens lists
+.venv/bin/python -m pytest -q                    # 128
 ```
