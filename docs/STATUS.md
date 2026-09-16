@@ -78,28 +78,38 @@ user-adjudicated `wrong` rows correctly beat their vault positives.
 
 ## IN FLIGHT: the full re-grade under the corrected rubric — RESUMABLE, just continue
 
-**118 batches staged in `db/batches_relabel/` (gitignored), rubric `7958bdf42066`, 2,946 postings + 27
-near-duplicates that copy their representative.** Every batch result is written the moment that batch finishes,
+**ACTIVE DIRECTORY IS `db/batches_relabel2/` — 106 batches, 2,646 postings, rubric `7958bdf42066`.**
+`db/batches_relabel/` is the first 12 batches, all graded and imported; leave it alone. 308 of 2,973 done. Every batch result is written the moment that batch finishes,
 so stopping anywhere costs at most one batch. The user's 5-hour session token budget will likely run out
 mid-run; his weekly budget refreshes 8 AM.
 
 ```bash
 cd /home/bensonjt/code/jobsearch                       # = /mnt/e/code/jobsearch
-.venv/bin/python finder.py judge status --dir db/batches_relabel        # where did we stop
+.venv/bin/python finder.py judge status --dir db/batches_relabel2        # where did we stop
 # grade the pending batches: one Claude Code subagent per batch, 6-8 in parallel, Sonnet. Prompt:
-#   read db/batches_relabel/batch_NNN.md, grade every posting, write db/batches_relabel/batch_NNN.result.json
+#   read db/batches_relabel2/batch_NNN.md, grade every posting, write db/batches_relabel2/batch_NNN.result.json
 #   as a JSON array of {posting_id, grade, lane, confidence, blocker, rationale}; reply with ONLY the count
 #   and the grade tally.
-.venv/bin/python finder.py judge import --dir db/batches_relabel --scorer claude-sonnet-batch   # safe to re-run
+.venv/bin/python finder.py judge import --dir db/batches_relabel2 --scorer claude-sonnet-batch   # safe to re-run
 ```
 
 **Why the whole corpus and not the cheap 600 (user's call, and he is right):** the analytics cap pushed roles
 into `wrong`, not only into `stretch`, so the 2,111 `wrong` rows are exactly where recovered fits will be found.
 A stratified sample would have measured the migration matrix but not recovered the rows.
 
+**`--relabel` is now idempotent** — it queues only postings whose newest label predates the current
+`rubric_version`, so re-running `judge export --relabel --batch-size 25 --dir <new dir>` after any stopping
+point produces exactly what is left. That is the resume path if the batch directory is ever lost.
+
+**Ordering bug found and fixed mid-run (commit below).** The first relabel queue concatenated the grades
+alphabetically, so batches 1-12 were 100% old-`adjacent` rows and the running tally read as a threefold jump in
+the good-fit rate. Those 308 labels are valid, just not a representative sample. `_spread()` now interleaves
+each grade proportionally, so any stopping point spans the corpus (section 17.2). **Do not read a mid-run tally
+from `db/batches_relabel/` as a corpus estimate.**
+
 **When the grading finishes, in this order:**
 ```bash
-.venv/bin/python finder.py judge import --dir db/batches_relabel --scorer claude-sonnet-batch
+.venv/bin/python finder.py judge import --dir db/batches_relabel2 --scorer claude-sonnet-batch
 .venv/bin/python finder.py judge report --csv db/snapshots/llm_labels.csv    # agreement + the CSV to eyeball
 .venv/bin/python finder.py labels --report && .venv/bin/python finder.py train --report
 .venv/bin/python finder.py rescreen-all && .venv/bin/python finder.py sync && .venv/bin/python finder.py report
