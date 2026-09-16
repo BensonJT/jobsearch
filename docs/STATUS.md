@@ -2,6 +2,53 @@
 
 _Last updated: 2026-09-16 (Claude Code / Opus, afternoon session). Overwrite at the end of each session; git history is the changelog._
 
+## IN FLIGHT — coverage recalibration (two WSL crashes on 2026-09-16; read this first)
+**What was being attempted.** Sprint plan order: retrain → rescreen → **recalibrate coverage against real hard
+negatives** → re-run the §15.7 eyeball → decide 3b. The retrain and the lens-model rescreen are **done and
+verified** (`72167e5`: out-of-fold mean probability falls monotonically bullseye → adjacent → stretch → wrong on
+both lenses, AUC 0.95 each). The user said "do 1" = the recalibration, and added: **if coverage still does not
+rank, he has something he is working on to show before next steps are decided.** The calibration has never
+produced a result, so that condition is still open.
+
+**What went wrong (EDT).**
+- 14:16 — `vw_hard_negatives` was EMPTY: the 1,320 judge-graded `wrong` rows had never been wired in. Fixed in
+  `refresh_hard_negatives` (now `e8431f9`, with an empty-`executemany` guard; 128 tests pass).
+- 14:17 — `coverage --calibrate` on the E: DB staged hard negatives (audit 7 · fit_top 200 · judged_wrong 299) and
+  a calibration set (1,117 positives · 439 hard negatives · 300 pseudo · requirement units for 2,236 postings),
+  then died in requirement-unit embedding: **`Bus error (core dumped)`, exit 135.** Not memory (4 GB free, no
+  OOM kill), not `/dev/shm` (3.9 G free), model loaded fine. Left a `loky` leaked-semaphore warning. Suspects:
+  torch/tokenizers threading, or mmap'd I/O over the `/mnt/e` 9p mount — **unresolved**.
+- 14:21 — relaunched on a native-ext4 copy (`~/jobsearch_native/jobsearch.duckdb`).
+- 14:22 — the user's "one worker" idea: relaunched single-threaded on the E: DB **while the native run was still
+  alive**. Two torch embedding jobs ran concurrently.
+- ~14:23 — **WSL crashed.** Most likely the two concurrent jobs, but that is unconfirmed.
+
+**Verified intact after recovery:** the DB opens and replays its WAL; 2,993 labels; hard_negatives 506 rows;
+2,065 coverage rows; both lens models (`tfidf_lr_process`, `tfidf_lr_technical`). Commit `9ab7755` (the leaked
+comp figure) is confirmed OFF the remote — the force-push listed below already happened.
+
+**SAFE RETRY — follow exactly. One process. Nothing else running. Native filesystem. Single-threaded.**
+```bash
+pgrep -af "finder.py" && echo "STOP: something is already running"      # must print nothing
+cp /mnt/e/code/jobsearch/db/jobsearch.duckdb ~/jobsearch_native/jobsearch.duckdb   # refresh the native copy first
+cd ~/code/jobsearch && OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 \
+  TOKENIZERS_PARALLELISM=false LOKY_MAX_CPU_COUNT=1 TORCH_NUM_THREADS=1 \
+  .venv/bin/python -u finder.py coverage --calibrate --db ~/jobsearch_native/jobsearch.duckdb \
+  > ~/jobsearch_native/calib.log 2>&1; echo "exit $?" >> ~/jobsearch_native/calib.log
+```
+Log to `~/jobsearch_native/` — **never `/tmp`**: a WSL crash wipes `/tmp`, which is why the first three logs are
+gone. Check the wrapper's own `exit` line; a pipeline can swallow a crash and report 0. If it succeeds, the
+calibration row lives in the native copy — re-run it on the E: DB (same flags) or copy the DB back, deliberately.
+If it bus-errors again single-threaded on native ext4, **threading and 9p are both ruled out**: suspect the
+encoder, e.g. try `--backend fastembed` or smaller encode batches.
+
+**Design question to raise before trusting the result.** Even the highest-fit slice of judged-`wrong` rows is
+mostly EASY (fit 0.17–0.72, median 0.23). A high AUC against them proves little; only a low one is decisive. The
+genuinely confusable band is **`stretch`** (out-of-fold mean 0.51). A real test of "does coverage rank" probably
+wants stretch-graded rows as the hard negatives. That is the user's call.
+
+**Push state:** `72167e5` and `e8431f9` are local, unpushed. The push go-ahead was given before the crash; ask again.
+
 ## Where this left off
 
 Nine commits, **local and unpushed**, and one of them is a **history rewrite that must be force-pushed**
@@ -22,7 +69,7 @@ review.
 Test count is **128**. `a10896a`'s message says 134; that number is wrong and 128 is the real one.
 
 ## NEXT SESSION: START HERE
-1. **Force-push.** `ba6a327` replaces `9ab7755`; until it lands, the comp anchor is still on the public
+1. ~~**Force-push.**~~ **DONE** — `9ab7755` confirmed off the remote 2026-09-16 after the crash. ~~`ba6a327` replaces `9ab7755`; until it lands, the comp anchor is still on the public
    remote. `git push --force-with-lease origin main`. Then reset the OptiPlex mirror rather than merging
    into it — its history diverged.
 2. **Review `Lens_Lists_20260916_1343.md`** in the vault's `Search_Results`. 200 `both`, 540 `process`,
