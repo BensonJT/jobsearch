@@ -38,11 +38,19 @@ Headings over four words without a colon now become body units (slight noise, ch
 user's applied postings that the old rules rejected, Blue Yonder and CACI now pass; the eight still rejected are rule
 decisions the user overrode by hand (hard-avoid industry, GTM scope, non-US, plant floor) plus the two ingest limits above.
 
-**Next, in order (user decisions pending):** (1) confirm §20.2 level rule → build with the `report_feedback` load, so
-the user grades only rule/human disagreements; (2) confirm §21 AI lens → AI-term subset regrade first; (3) re-run the
-coverage baseline (R2 equivalent) on the fixed splitter before any new coverage variant; (4) the review queue for
-"rules reject but model confident". Pushing: 20+ local commits unpushed; ask the user; run the `.personal_patterns`
-scan first (baseline 3 lines).
+**Decided with the user 2026-09-17 (sprint plan §20.2–20.5, binding):** the level rule's values and wording are the
+user's (§20.2 as edited); `US Off-Site` and `#LI-Remote` are positive-only remote signals (§20.3); order is build
+§20.2 + §21 → fresh `sweep_ats.py` ingestion → `rescreen-all` → coverage re-baseline → Phase 4 (§20.4); Gemma cap 100
+per day and application-skill cap 10, both in `profile_local`; Gemma is verified $0 with no paid tier (§20.4); the
+golden-source re-export with a `needs_you` flag waits until the level rule and AI lens exist (§20.5).
+
+**Still open:** the user has not yet confirmed the §21 AI-lens fit boundary — ask before building §21. The
+"rules reject but model confident" review queue is queued behind all of the above.
+
+**Next session, first action:** write the coding brief for §20.2, §20.3 and (once confirmed) §21, then hand the
+implementation to Sonnet agents on disjoint files (Fable designs and audits; that split saved Fable tokens today —
+four agents, one commit). Pushing: 23 local commits unpushed; ask the user; run the `.personal_patterns` scan first
+(baseline 3 lines: `backend/profile.py:111`, two lines in `tests/test_finder.py`).
 
 ## PREVIOUS NOW (2026-09-16/17, Opus) — the repo moved, evidence reads Postgres, coverage experiments FINISHED
 **Location.** The repo lives at **`~/jobsearch` on the WSL ext4 disk**. The E: copy (`/mnt/e/code/jobsearch`) was deleted at
