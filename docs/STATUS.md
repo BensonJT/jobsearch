@@ -4,7 +4,7 @@ _Last updated: 2026-09-17 (Claude Code / Opus), after two days of work: the ext4
 
 **Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **131** passing.
 
-## NOW — the repo moved, coverage recalibration ran, experiments in flight (2026-09-16)
+## NOW — the repo moved, evidence reads Postgres, coverage experiments FINISHED (2026-09-16/17)
 **Location.** The repo lives at **`~/jobsearch` on the WSL ext4 disk**. The E: copy (`/mnt/e/code/jobsearch`) was deleted at
 the user's request after a byte-level check. Why: `/mnt/e` is a 9p mount served by Windows, and torch/transformers
 imports over it failed under Windows memory pressure (bus error, ENOMEM on `open()`, one WSL crash). The one file
