@@ -1,10 +1,50 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-17 (Claude Code / Opus), after two days of work: the ext4 move, Postgres evidence, and seven coverage experiments. Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-17 (Claude Code / Fable), after the audit repairs. Overwrite at the end of each session; git history is the changelog._
 
-**Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **131** passing.
+**Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **157** passing.
 
-## NOW — the repo moved, evidence reads Postgres, coverage experiments FINISHED (2026-09-16/17)
+## NOW — audit repairs landed, models retrained on grouped folds, corpus rescreened (2026-09-17, Fable)
+**Read first:** the audit is in the vault, `Professional/Areas/Job_Search/Tools/Jobsearch_Audit_20260917.md` (it names
+employers and outcomes, so it is NOT in this public repo). Sprint plan **§20** records the repairs and PROPOSES the
+level rule; **§21** proposes the applied-AI lens. Both proposals wait on the user.
+
+**What changed (`3763d6e`, tests 131 → 157).** Fable audited, four Sonnet agents fixed, Fable re-read every diff:
+- **All three fit models were unloadable** since the ext4 move (`models.path` was absolute on the deleted E:). A sweep
+  would have screened rules-only and written NULL fit on every row it touched. Paths are now stored relative; the loader
+  falls back to `db/models/<basename>`.
+- **CV folds are grouped by JD text hash** (identical reposts / judge `dup:` copies never split across folds). Retrained
+  all three models: main `f948feddead3` AUC 0.945 (was 0.947 with the leak), process 0.951, technical 0.950 — the leak
+  was real but small. Train metrics no longer double-count career-site copies; `signal_report` reads stored final_score.
+- **Requirement splitter** no longer drops short bulleted skill lines (Black Belt cert, "Strong SQL and Python
+  experience" etc. all vanished before). **Every coverage AUC in `COVERAGE_EXPERIMENTS.md` predates this fix.**
+- **Rules:** remote is read over the whole JD and beats a generic ATS `onsite` flag; "team of N" flags instead of
+  rejecting (CACI "team of 250+ professionals" was a hard reject); travel matches 100%; rescreen predicate NULL-safe.
+  Measured on the user's own tracker rows: the rule engine had rejected 10 of the 30 postings he applied to.
+- **Coverage/eval hygiene:** stretch rows out of the hard-negative slices; one row set per AUC in a calibration report
+  (`n_rows` printed); grid-edge warnings; `current_calibration` matched to encoder / reranker / req_context so a
+  reranker calibration can never be applied to cosines; `evidence.ensure_current` no longer swallows programming errors.
+- **Ingest:** Workday clamp checked on every pull (a scoped board growing past 2,000 was re-armed for false takedowns);
+  page-1 repeat guard; Eightfold `count=0` → truncated; `postings.detail_attempts` (**schema v9**) ages out dead
+  fetches after 3 tries; tracker fuzzy match within ±90 days of `date_applied`; `html_to_text` keeps inline tags inline
+  (changes `description_hash` for newly fetched text only).
+
+**Known limits recorded, not fixed:** an ATS `onsite` flag with a specific city and a JD that never says remote stays
+on-site (Microsoft keeps its remote flag in metadata the adapter drops); "US Off-Site" is one employer's label.
+Headings over four words without a colon now become body units (slight noise, chosen over dropping real bullets).
+
+**Rescreen done** (574 s, rules `16fa57dbeded`, model `f948feddead3`, 63,453 rows): candidate 239 → **352**, review
+1,133 → **1,415**, reject 62,081 → **61,686** (−395). Every active row with a JD carries a fit again (0 NULL). Of the
+user's applied postings that the old rules rejected, Blue Yonder and CACI now pass; the eight still rejected are rule
+decisions the user overrode by hand (hard-avoid industry, GTM scope, non-US, plant floor) plus the two ingest limits above.
+
+**Next, in order (user decisions pending):** (1) confirm §20.2 level rule → build with the `report_feedback` load, so
+the user grades only rule/human disagreements; (2) confirm §21 AI lens → AI-term subset regrade first; (3) re-run the
+coverage baseline (R2 equivalent) on the fixed splitter before any new coverage variant; (4) the review queue for
+"rules reject but model confident". Pushing: 20+ local commits unpushed; ask the user; run the `.personal_patterns`
+scan first (baseline 3 lines).
+
+## PREVIOUS NOW (2026-09-16/17, Opus) — the repo moved, evidence reads Postgres, coverage experiments FINISHED
 **Location.** The repo lives at **`~/jobsearch` on the WSL ext4 disk**. The E: copy (`/mnt/e/code/jobsearch`) was deleted at
 the user's request after a byte-level check. Why: `/mnt/e` is a 9p mount served by Windows, and torch/transformers
 imports over it failed under Windows memory pressure (bus error, ENOMEM on `open()`, one WSL crash). The one file
