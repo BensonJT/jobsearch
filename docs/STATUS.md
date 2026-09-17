@@ -1,106 +1,56 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-16 15:40 EDT (Claude Code / Opus, before a Windows reboot). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-16 20:55 EDT (Claude Code / Opus). Overwrite at the end of each session; git history is the changelog._
 
-## AFTER THE REBOOT — do this first (written 15:40 EDT 2026-09-16, just before the user rebooted Windows)
-**Fourth attempt, 15:33, after the user closed apps (Excel etc.):** Windows looked healthy (3,976 MB available, no
-paging, commit free 6,189 MB) and Linux had 5,702 MB. The job STILL sat in `state D wait p9_client_rpc` for its whole
-life, importing torch/transformers over `/mnt/e` at ~1 MB/s (142 MB read in 110 s). I stopped it at 15:35 (exit 143)
-because the user was rebooting. Conclusion: freeing apps is not enough — **the venv on the 9p mount is the problem.
-Stop retrying from `.venv`. Build the native venv first.** The user also cleared context; this block is the handoff.
+## NOW — the repo moved, coverage recalibration ran, experiments in flight (2026-09-16)
+**Location.** The repo lives at **`~/jobsearch` on the WSL ext4 disk**. The E: copy (`/mnt/e/code/jobsearch`) was deleted at
+the user's request after a byte-level check. Why: `/mnt/e` is a 9p mount served by Windows, and torch/transformers
+imports over it failed under Windows memory pressure (bus error, ENOMEM on `open()`, one WSL crash). The one file
+kept on E: is the pre-compaction backup, `E:\backups\jobsearch\jobsearch.duckdb.precompact-20260916` — delete once a
+sweep has run clean. `.env`, `evidence.local.toml`, `*_local.py`, `.personal_patterns` and `db/` were copied by hand
+(a clone does not bring them). The Linux disk is a VHDX on C:, which is nearly full — see "Storage" below.
 
-1. **Confirm nothing is running** (command of its own): `pgrep -af '[f]inder\.py'` → must print nothing.
-2. **Build the native venv** (quiet machine, ~10-15 min, one-time). Current `.venv`: Python 3.14.7, torch 2.14.0+cpu,
-   transformers 5.17.0, sentence-transformers 6.0.1, fastembed 0.8.0, duckdb 1.5.5, scikit-learn 1.9.1.
-   ```bash
-   python3.14 -m venv ~/jobsearch_native/venv      # if 3.14 is missing: uv venv -p 3.14 ~/jobsearch_native/venv
-   ~/jobsearch_native/venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
-   ~/jobsearch_native/venv/bin/pip install -r ~/code/jobsearch/requirements.txt
-   ```
-   Also copy the HuggingFace model cache to ext4 if it lives on /mnt (check `HF_HOME`; default `~/.cache` is native).
-3. **Point the launcher at it:** in `~/jobsearch_native/run_calibration.sh` change `.venv/bin/python` →
-   `~/jobsearch_native/venv/bin/python`. The launcher already does single-thread env, `nice`, a Linux-memory watchdog
-   (1,500 MB) and a Windows-commit watchdog (800 MB), and logs `state/wait/read` every 10 s to
-   `~/jobsearch_native/memwatch.log`. The code still `cd`s to `~/code/jobsearch` (on /mnt/e) — small .py reads are fine.
-4. **Refresh the native DB copy** (the E: DB is the source of truth; nothing has written to it since): 
-   `cp /mnt/e/code/jobsearch/db/jobsearch.duckdb ~/jobsearch_native/jobsearch.duckdb`
-5. **Run** `~/jobsearch_native/run_calibration.sh` in the background; watch `calib.log` for `Calibration`/`AUC`/
-   `Traceback`/`WATCHDOG`/`=== END`, and `memwatch.log` for `state D wait p9_client_rpc` with a flat read count (= still
-   on 9p → stop it). Expect import in seconds, not minutes.
-6. **Report** thresholds, AUC by signal, medians, paired gap — and raise the design question below (judged `wrong`
-   negatives are mostly easy; `stretch` is the confusable band). Then §15.7 eyeball → decide 3b.
-7. If coverage still does not rank, the user's "thing to show" is the report-feedback review in the vault
-   (`Professional/Areas/Job_Search/Tools/Report_Feedback_20260916.csv`: `human_grade` = kind of work ignoring level;
-   new `level_fit` column = in_range/stretch_up/out_of_reach). Offer pending: pre-fill `level_fit` on his other
-   confirmed rows once he finishes. Then the QUEUED level ceiling below.
+**Evidence now reads PostgreSQL** (`b1c9d3d`). Bullets, duty statements and claim guards come from
+`resume.vw_resume_bullets` / `vw_resume_blocks` / `vw_resume_guards` via a new `postgres` source type
+(`path = "$RESUME_DB_URL"`, set in `.env`). `evidence_units` is a cache: `ensure_current` re-embeds only changed units
+before coverage/calibration, and a rebuild refuses to empty a source that is unreachable.
 
-**Push state:** `72167e5 e8431f9 7af64b6 7e55719 346f144` + this STATUS commit are local and unpushed. Ask before pushing
-(run the `.personal_patterns` scan first; it is a public repo).
+**The recalibration finished — coverage does not rank.** Full record, one section per run:
+**`docs/COVERAGE_EXPERIMENTS.md`**. Short version (AUC):
 
-## IN FLIGHT — coverage recalibration (two WSL crashes on 2026-09-16; read this first)
-**What was being attempted.** Sprint plan order: retrain → rescreen → **recalibrate coverage against real hard
-negatives** → re-run the §15.7 eyeball → decide 3b. The retrain and the lens-model rescreen are **done and
-verified** (`72167e5`: out-of-fold mean probability falls monotonically bullseye → adjacent → stretch → wrong on
-both lenses, AUC 0.95 each). The user said "do 1" = the recalibration, and added: **if coverage still does not
-rank, he has something he is working on to show before next steps are decided.** The calibration has never
-produced a result, so that condition is still open.
+| Run | coverage vs hard neg | coverage vs stretch | fit_heldout vs stretch |
+|---|---|---|---|
+| R2 baseline | 0.559 | 0.575 | 0.955 |
+| S1 core evidence only | 0.543 | — | — |
+| S2 "<title>: <requirement>" | 0.607 | 0.610 | 0.955 |
+| S4a MiniLM cross-encoder rerank | 0.604 | **0.669** | 0.955 |
 
-**What went wrong (EDT).**
-- 14:16 — `vw_hard_negatives` was EMPTY: the 1,320 judge-graded `wrong` rows had never been wired in. Fixed in
-  `refresh_hard_negatives` (now `e8431f9`, with an empty-`executemany` guard; 128 tests pass).
-- 14:17 — `coverage --calibrate` on the E: DB staged hard negatives (audit 7 · fit_top 200 · judged_wrong 299) and
-  a calibration set (1,117 positives · 439 hard negatives · 300 pseudo · requirement units for 2,236 postings),
-  then died in requirement-unit embedding: **`Bus error (core dumped)`, exit 135.** Not memory (4 GB free, no
-  OOM kill), not `/dev/shm` (3.9 G free), model loaded fine. Left a `loky` leaked-semaphore warning. Suspects:
-  torch/tokenizers threading, or mmap'd I/O over the `/mnt/e` 9p mount — **unresolved**.
-- 14:21 — relaunched on a native-ext4 copy (`~/jobsearch_native/jobsearch.duckdb`).
-- 14:22 — the user's "one worker" idea: relaunched single-threaded on the E: DB **while the native run was still
-  alive**. Two torch embedding jobs ran concurrently.
-- ~14:23 — **WSL crashed.** Most likely the two concurrent jobs, but that is unconfirmed.
+Findings: (1) the fit model already separates positives from `stretch` at 0.955 held-out; (2) the `fit_top` hard
+negatives are chosen FOR high fit and, after reranking, look like real fits (McKesson Lead Workforce Intelligence
+Consultant, Capital One Product Operations PM) — a biased calibration target; (3) the reranker removes the
+engineering-role false positives, so coverage's value is as a trustworthy **explainer**, not a ranker; (4) S4a's
+thresholds hit the grid edge (0.95 / 0.05), so continuous credit is the next candidate.
 
-**Verified intact after recovery:** the DB opens and replays its WAL; 2,993 labels; hard_negatives 506 rows;
-2,065 coverage rows; both lens models (`tfidf_lr_process`, `tfidf_lr_technical`). Commit `9ab7755` (the leaked
-comp figure) is confirmed OFF the remote — the force-push listed below already happened.
+**In flight at 20:55** (one process at a time, scratch DBs in `~/jobsearch_native/exp/`, runner `run_exp.sh`):
+S4b (reranker + title context, ~3 h) → S3 resume (bge-base-en-v1.5, 768-d, stopped at 3/14 batches to let S4 go
+first) → S2c (clean baseline re-run). Logs: `~/jobsearch_native/exp/<NAME>.log`. **Record each result in
+`docs/COVERAGE_EXPERIMENTS.md` and commit.** The live DB is untouched by all of it.
 
-**ROOT CAUSE, found on the third attempt (15:21 EDT): the Python environment lives on `/mnt/e`.** A single-threaded,
-native-DB retry died at IMPORT with `OSError: [Errno 12] Cannot allocate memory` opening an ordinary `.py` file inside
-`.venv/.../transformers/models/` — while Linux had **5,868 MB available**. `/mnt/e` is a 9p mount served by a process
-on the WINDOWS side; when Windows is under memory pressure (the user had several apps open), that server fails
-requests — ENOMEM on `open()`, SIGBUS on memory-mapped reads. `transformers` walks hundreds of model files at import
-and `torch` memory-maps large libraries, so heavy ML imports are exactly the load that trips it. That one mechanism
-explains all three failures: the 14:20 bus error (mmap over 9p, 4 GB free in Linux), the WSL crash (two heavy torch
-jobs importing over 9p at once), and this ENOMEM. **Moving only the DB to native ext4 was not enough — the packages
-were still on 9p.** The memory watchdog did not fire because it watched Linux memory, which stayed healthy; the
-pressure was on the Windows side of the mount.
+**Experiment switches** (env, unset = production): `JOBSEARCH_REQ_CONTEXT=title`, `JOBSEARCH_RERANKER=<model>`,
+`JOBSEARCH_RERANK_TOP=<n>`. `requirement_units` has no model column in its primary key, so switching modes or models
+replaces cached rows — run each variant on its own DB copy. Calibration now also reports AUC vs `stretch` and vs
+judge-confirmed `wrong` only.
 
-**The durable fix (recommended, not yet done):** a second venv on native ext4, e.g. `~/jobsearch_native/venv`, used
-for heavy ML jobs (coverage, calibration, embeddings); code and DB stay where they are. Needs a quiet machine to
-install (CPU torch + sentence-transformers, ~10-15 min). Until then, retrying only works if Windows has headroom.
+**Decisions waiting on the user.** (a) Whether coverage becomes an explainer only (weight 0 in ranking, matches shown
+in the report) — the evidence points that way. (b) Replace `fit_top` as a calibration target with judged rows.
+(c) Storage: the Linux VHDX on C: is 122 GB (85 GB used; Meridian's Postgres is 35 GB) with 30 GB free on C:.
+Options: compact the VHDX (~37 GB back), and/or a second VHDX on E: mounted into WSL for Meridian's data and `db/`
+(native speed, off C:, WSL still boots without the drive). Needs admin PowerShell + `wsl --shutdown`.
+Then: the report-feedback review (`level_fit` column) and the QUEUED level ceiling below.
 
-**SAFE RETRY — follow exactly. One process. Nothing else running. Native filesystem. Single-threaded.**
-(Check for a running job with `pgrep -af '[f]inder\.py'` in a command of its own: any other occurrence of the literal
-text finder.py in the same command makes pgrep match its own shell. And run from the native venv once it exists —
-the launcher at `~/jobsearch_native/run_calibration.sh` still points at `/mnt/e/code/jobsearch/.venv`.)
-```bash
-pgrep -af "finder.py" && echo "STOP: something is already running"      # must print nothing
-cp /mnt/e/code/jobsearch/db/jobsearch.duckdb ~/jobsearch_native/jobsearch.duckdb   # refresh the native copy first
-cd ~/code/jobsearch && OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 \
-  TOKENIZERS_PARALLELISM=false LOKY_MAX_CPU_COUNT=1 TORCH_NUM_THREADS=1 \
-  .venv/bin/python -u finder.py coverage --calibrate --db ~/jobsearch_native/jobsearch.duckdb \
-  > ~/jobsearch_native/calib.log 2>&1; echo "exit $?" >> ~/jobsearch_native/calib.log
-```
-Log to `~/jobsearch_native/` — **never `/tmp`**: a WSL crash wipes `/tmp`, which is why the first three logs are
-gone. Check the wrapper's own `exit` line; a pipeline can swallow a crash and report 0. If it succeeds, the
-calibration row lives in the native copy — re-run it on the E: DB (same flags) or copy the DB back, deliberately.
-If it bus-errors again single-threaded on native ext4, **threading and 9p are both ruled out**: suspect the
-encoder, e.g. try `--backend fastembed` or smaller encode batches.
+**Push state:** everything since `9b2e7a2` is local and unpushed (`72167e5` onward). Ask before pushing; run the
+`.personal_patterns` scan first (known 3-line baseline).
 
-**Design question to raise before trusting the result.** Even the highest-fit slice of judged-`wrong` rows is
-mostly EASY (fit 0.17–0.72, median 0.23). A high AUC against them proves little; only a low one is decisive. The
-genuinely confusable band is **`stretch`** (out-of-fold mean 0.51). A real test of "does coverage rank" probably
-wants stretch-graded rows as the hard negatives. That is the user's call.
-
-**Push state:** `72167e5` and `e8431f9` are local, unpushed. The push go-ahead was given before the crash; ask again.
 
 ## QUEUED — a level ceiling in the rule engine (raised 2026-09-16 during the user's report review)
 **Why.** Reviewing `Report_Feedback_20260916.csv`, the user found most of his `wrong` calls were about **level and
