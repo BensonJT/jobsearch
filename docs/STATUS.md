@@ -46,6 +46,11 @@ in the report) — the evidence points that way. (b) Replace `fit_top` as a cali
 (c) Storage: the Linux VHDX on C: is 122 GB (85 GB used; Meridian's Postgres is 35 GB) with 30 GB free on C:.
 Options: compact the VHDX (~37 GB back), and/or a second VHDX on E: mounted into WSL for Meridian's data and `db/`
 (native speed, off C:, WSL still boots without the drive). Needs admin PowerShell + `wsl --shutdown`.
+(d) **Parked idea from the user — do not lose it:** if coverage becomes a stored dimension, use its per-requirement
+matches to shortlist resume bullets for the job application skill (Keystone vault
+`Professional/Areas/Job_Search/Tools/IDEA_Coverage_Bullet_Selection.md`). Prerequisites: matches must carry `bullet_id`
+(bullet source `ref_columns` is position + project today), keep every requirement's top evidence rather than the top 5
+per posting, and a `--jd-file` entry point for JDs that are not swept postings.
 Then: the report-feedback review (`level_fit` column) and the QUEUED level ceiling below.
 
 **Push state:** everything since `9b2e7a2` is local and unpushed (`72167e5` onward). Ask before pushing; run the
