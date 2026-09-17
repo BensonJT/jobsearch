@@ -44,7 +44,7 @@ user's (§20.2 as edited); `US Off-Site` and `#LI-Remote` are positive-only remo
 per day and application-skill cap 10, both in `profile_local`; Gemma is verified $0 with no paid tier (§20.4); the
 golden-source re-export with a `needs_you` flag waits until the level rule and AI lens exist (§20.5).
 
-**Still open:** the user has not yet confirmed the §21 AI-lens fit boundary — ask before building §21. The
+**§21 AI lens CONFIRMED by the user 2026-09-17** (boundary as written); validate live on AI-titled postings first, adjusting the rubric with the user until it matches the other two lenses (§21). Build it with §20.2/20.3. The
 "rules reject but model confident" review queue is queued behind all of the above.
 
 **Next session, first action:** write the coding brief for §20.2, §20.3 and (once confirmed) §21, then hand the
