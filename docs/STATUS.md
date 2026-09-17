@@ -1,10 +1,72 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-17 (Claude Code / Fable), after the audit repairs. Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-17 (Claude Code / Fable). The NOW section is the handoff; older sections are kept below it._
+written by Agent D from the working tree diff, not yet edited by Fable. Overwrite at the end of each session;
+git history is the changelog._
 
-**Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **157** passing.
+**Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **194** passing before this session's changes; see the full-suite line below for after.
 
-## NOW — audit repairs landed, models retrained on grouped folds, corpus rescreened (2026-09-17, Fable)
+## NOW — level rule, remote tags and the applied-AI lens are BUILT; pilot graded; next is fresh ingest → rescreen-all (2026-09-17, Fable)
+**How it was built.** Fable wrote `docs/BRIEF_20260917_level_remote_ai.md` (file-level work orders for sprint plan
+§20.2 / §20.3 / §21), four Sonnet agents built on disjoint files in two waves, Fable audited every diff and fixed
+four defects the agents' own tests missed (below). Tests 157 → 197. One commit.
+
+**§20.2 level rule — `rules.level_fit_rule`** writes `notes["level_fit"]` ∈ too_low / in_range / stretch_up /
+out_of_reach / unknown plus `level_fit_hits` (not persisted). Never a reason or a flag: `verdict` and `rule_score`
+are untouched. Signals: title tiers (`LEVEL_*_TITLE_TERMS`), org-building phrases + `LARGE_TEAM_MARKERS` (capped at
+2), P&L ownership, PEOPLE-management years over `LEVEL_MANAGERIAL_YEARS_MAX` (profile default 3, personal value
+tighter), team size from the now-split `direct_reports_rule` notes; a Director title is itself one scope hit, so
+Director alone = stretch_up and Director + one more = out_of_reach. "Chief of Staff" is a stretch term, not C-suite.
+Schema **v10**: `screens.level_fit`, `screens.fit_ai`, `llm_labels.grade_ai`, `report_feedback` (vault spec DDL +
+`level_fit`, `grade_before_split`, `needs_confirm`, `split_reason`), views `vw_report_feedback_latest`,
+`vw_level_agreement` (reads STORED level_fit — empty until rescreen), `vw_label_set_ai`; `vw_lens_fit` / `vw_shortlist`
+carry `level_fit`, `fit_ai`, `grade_ai`, `ai_strong`, `ai_standout`; `lens_bucket` unchanged. `pipeline.screen`
+writes `level_fit` and `fit_ai`. New `backend/finder/feedback.py` + `finder.py feedback --load CSV --agreement
+--export OUT` (the rule is computed LIVE for the agreement and the export, so neither waits on a rescreen).
+
+**§20.2 acceptance — DONE on the live DB.** The 232 golden-source rows are loaded (0 skipped, 0 by-URL). Against
+the 22 confirmed human `level_fit` calls the rule is **20/22 exact (90.9%)** and **12/13 on in_range/out_of_reach
+(92.3%; target ≥ 80%)**. The two disagreements: an Associate Director whose Required block says "build and scale"
+(rule out_of_reach, user stretch_up) and a "… Office Leader" title with no level word, years or band (rule
+in_range off years, user out_of_reach) — "leader" is not a title term; the user decides. Re-export written to the
+vault `Tools/Report_Feedback_20260917_rule.csv`: 232 rows, **73 `needs_you`** (35 human-vs-judge grade > 1 step,
+34 low confidence, 15 needs_confirm, 1 level > 1 step, 1 rule-out-of-level on a build/consider). Rule over all
+232: in_range 129 · stretch_up 55 · out_of_reach 47 · unknown 1.
+
+**§20.3 remote tags.** `REMOTE_TERMS` += `us off-site`, `#li-remote`, `#bi-remote`; `US Off-Site` is also read
+from the `locations` list; `#LI-Hybrid` + `#LI-Remote` = remote; a lone `#LI-Hybrid` adds nothing.
+
+**§21 applied-AI lens — BUILT and PILOTED.** `RUBRIC_LENS_AI` (public) + `RUBRIC_PERSONAL_AI` (gitignored, from the
+coaching brief §5–6 with its guards kept verbatim); batch header, `_validate`, `load_results`, `to_csv`,
+`agreement()` carry `grade_ai` (old two-lens result files still import with NULL); `features.LENSES` += `ai`;
+`judge.pools` gains `ai_title` (title matches `AI_TITLE_RE`, 118 active non-rejected now; 1,704 with rejects;
+11,929 active JDs mention an AI term). New rubric version `b9bd6f282570` — every earlier label predates it, by design.
+**Pilot: 40 AI-titled postings graded** (`db/batches_ai_pilot`, imported): grade_ai bullseye 3 · adjacent 17 ·
+stretch 3 · wrong 17. The boundary held — engineers, a data scientist, architects, platform product, sales,
+marketing and risk/audit all `wrong`; enablement/adoption seats bullseye; independence 28/40 (70%) differ from
+BOTH other lenses (§18.7 bar was 67%). **Two things to settle with the user before the AI-term subset:** (1)
+AI-transformation leadership where the AI is a mandate and the work is process (three of the user's own builds)
+grades `adjacent` on the AI lens, as the rubric says ("directed rather than done") — right or too low? (2) three
+forward-deployed-engineer postings got `adjacent` on the strength of familiar tooling although the core job is
+agent-framework engineering, which the boundary says is `wrong` — tighten the prose or accept.
+
+**Reports.** `Jobs_Found` and the lens lists order in_range → stretch_up → unknown → score; out_of_reach / too_low
+never take a block or a top-table row and sit in a collapsed `<details>` tail; `Level` column everywhere; a fourth
+lens list "Strong on APPLIED AI" reads `ai_strong` beside the three (a row may appear twice). Until `rescreen-all`
+runs, `level_fit` is NULL on every stored screen, so today's reports are unchanged.
+
+**Fable's audit fixes to the agents' work:** managerial-years regex matched any "management" ("10+ years of project
+management experience" would have pushed most of the lane to stretch_up) → people-management only; "chief" made
+Chief of Staff out_of_reach → stretch term; the CSV loader opened the BOM-carrying vault export as plain utf-8
+(every posting_id would have read blank); the `lenses` AI count skipped the decided/tracker filter the other three
+use; the report fixture's "Senior Director" titles are now "Senior Manager" (they are meant to reach a block).
+
+**Next (§20.4 order):** fresh `sweep_ats.py` ingestion → `rescreen-all` (fills `level_fit` / rules `2026-09-17.1`)
+→ coverage re-baseline on the fixed splitter → Phase 4 (Gemma cap 100/day, application-skill cap 10). Then the
+AI-term subset regrade (+100-row control) once the two §21 questions are settled, then `train --lens ai`. Pushing:
+24 local commits unpushed; ask the user; `.personal_patterns` scan baseline is still 3 lines.
+
+## PREVIOUS NOW — audit repairs landed, models retrained on grouped folds, corpus rescreened (2026-09-17, Fable)
 **Read first:** the audit is in the vault, `Professional/Areas/Job_Search/Tools/Jobsearch_Audit_20260917.md` (it names
 employers and outcomes, so it is NOT in this public repo). Sprint plan **§20** records the repairs and PROPOSES the
 level rule; **§21** proposes the applied-AI lens. Both proposals wait on the user.
