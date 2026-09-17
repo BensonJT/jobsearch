@@ -1,6 +1,8 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-17 01:55 EDT (Claude Code / Opus). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-17 (Claude Code / Opus), after two days of work: the ext4 move, Postgres evidence, and seven coverage experiments. Overwrite at the end of each session; git history is the changelog._
+
+**Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **131** passing.
 
 ## NOW — the repo moved, coverage recalibration ran, experiments in flight (2026-09-16)
 **Location.** The repo lives at **`~/jobsearch` on the WSL ext4 disk**. The E: copy (`/mnt/e/code/jobsearch`) was deleted at
@@ -65,8 +67,12 @@ schema + a `vw_label_set_ai` view, a regrade of the labeled corpus (~3,000 posti
 a third lens model. Design with the user before building.
 Then: the report-feedback review (`level_fit` column) and the QUEUED level ceiling below.
 
-**Push state:** everything since `9b2e7a2` is local and unpushed (`72167e5` onward). Ask before pushing; run the
-`.personal_patterns` scan first (known 3-line baseline).
+**Commits since the last push (19 incl. this handoff, all local, `72167e5` onward):** lens calibration OOF fix · judged-wrong hard
+negatives · three STATUS handoffs through the crashes · Postgres evidence source (`b1c9d3d`) · ext4 move in CLAUDE.md
+(`621fec4`) · experiment switches + stretch AUC (`e5cbc39`) · judged-wrong AUC (`d8fe17a`) · OOF fit for hard
+negatives (`1566e32`) · the S2a–S2c / S3 / S4a / S4b records and Conclusions · the bullet-selection idea and the AI
+lens (STATUS). Ask before pushing; run the `.personal_patterns` scan first (known 3-line baseline:
+`backend/profile.py:111`, two lines in `tests/test_finder.py`).
 
 
 ## QUEUED — a level ceiling in the rule engine (raised 2026-09-16 during the user's report review)
@@ -97,10 +103,9 @@ industry; count the distinct kinds of work never owned: none = bullseye, one = a
 overlap = stretch, almost none = wrong. Scale goes in `level_fit`, gates and logistics in `verdict`.
 Content not read or posting dead → grade blank.
 
-## Where this left off
+## Earlier on 2026-09-16 (before the recalibration) — kept for the open items at the end
 
-Nine commits, **local and unpushed**, and one of them is a **history rewrite that must be force-pushed**
-(see "Personal data was live on the public remote" below — do this first).
+Nine commits from that session were pushed; the history rewrite of `9ab7755` is on the remote (verified).
 
 The four queued items are done: the corpus is rescreened under current rules, the three clamped boards
 enumerate fully, every row carries a per-lens fit, and the three lens lists are written and waiting for
@@ -114,9 +119,9 @@ review.
 | `a10896a` | Per-lens fit on every row: `screens.fit_process` / `fit_technical`, `vw_lens_fit` |
 | `22f0ac1` | The three lens lists, and two CLI commands that were documented but never built |
 
-Test count is **128**. `a10896a`'s message says 134; that number is wrong and 128 is the real one.
+Test count then was 128 (`a10896a`'s message says 134, which was wrong); it is **131** after 2026-09-17.
 
-## NEXT SESSION: START HERE
+## Still-open items from that session (the "NOW" section above takes priority)
 1. ~~**Force-push.**~~ **DONE** — `9ab7755` confirmed off the remote 2026-09-16 after the crash. ~~`ba6a327` replaces `9ab7755`; until it lands, the comp anchor is still on the public
    remote. `git push --force-with-lease origin main`. Then reset the OptiPlex mirror rather than merging
    into it — its history diverged.
