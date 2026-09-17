@@ -1,6 +1,6 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-16 20:55 EDT (Claude Code / Opus). Overwrite at the end of each session; git history is the changelog._
+_Last updated: 2026-09-17 01:55 EDT (Claude Code / Opus). Overwrite at the end of each session; git history is the changelog._
 
 ## NOW — the repo moved, coverage recalibration ran, experiments in flight (2026-09-16)
 **Location.** The repo lives at **`~/jobsearch` on the WSL ext4 disk**. The E: copy (`/mnt/e/code/jobsearch`) was deleted at
@@ -23,7 +23,9 @@ before coverage/calibration, and a rebuild refuses to empty a source that is unr
 | R2 baseline | 0.559 | 0.575 | 0.955 |
 | S1 core evidence only | 0.543 | — | — |
 | S2 "<title>: <requirement>" | 0.607 | 0.610 | 0.955 |
+| S3 bge-base encoder | 0.566 | 0.628 | 0.955 |
 | S4a MiniLM cross-encoder rerank | 0.604 | **0.669** | 0.955 |
+| S4b rerank + title context | 0.617 | 0.664 | 0.955 |
 
 Findings: (1) the fit model already separates positives from `stretch` at 0.955 held-out; (2) the `fit_top` hard
 negatives are chosen FOR high fit and, after reranking, look like real fits (McKesson Lead Workforce Intelligence
@@ -31,10 +33,10 @@ Consultant, Capital One Product Operations PM) — a biased calibration target; 
 engineering-role false positives, so coverage's value is as a trustworthy **explainer**, not a ranker; (4) S4a's
 thresholds hit the grid edge (0.95 / 0.05), so continuous credit is the next candidate.
 
-**In flight at 20:55** (one process at a time, scratch DBs in `~/jobsearch_native/exp/`, runner `run_exp.sh`):
-S4b (reranker + title context, ~3 h) → S3 resume (bge-base-en-v1.5, 768-d, stopped at 3/14 batches to let S4 go
-first) → S2c (clean baseline re-run). Logs: `~/jobsearch_native/exp/<NAME>.log`. **Record each result in
-`docs/COVERAGE_EXPERIMENTS.md` and commit.** The live DB is untouched by all of it.
+**Experiments finished 2026-09-17 01:52** — S4b, S3 and S2c are recorded, with a Conclusions section at the end of
+`docs/COVERAGE_EXPERIMENTS.md`. Short version: coverage never ranks (best 0.669 vs the fit model's 0.955 on stretch);
+the MiniLM reranker without title context (S4a) is the configuration to keep if coverage becomes an explainer; title
+context and bge-base add little. All scratch DBs deleted; the live DB was never touched.
 
 **Experiment switches** (env, unset = production): `JOBSEARCH_REQ_CONTEXT=title`, `JOBSEARCH_RERANKER=<model>`,
 `JOBSEARCH_RERANK_TOP=<n>`. `requirement_units` has no model column in its primary key, so switching modes or models
