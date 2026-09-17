@@ -44,11 +44,17 @@ coaching brief §5–6 with its guards kept verbatim); batch header, `_validate`
 **Pilot: 40 AI-titled postings graded** (`db/batches_ai_pilot`, imported): grade_ai bullseye 3 · adjacent 17 ·
 stretch 3 · wrong 17. The boundary held — engineers, a data scientist, architects, platform product, sales,
 marketing and risk/audit all `wrong`; enablement/adoption seats bullseye; independence 28/40 (70%) differ from
-BOTH other lenses (§18.7 bar was 67%). **Two things to settle with the user before the AI-term subset:** (1)
-AI-transformation leadership where the AI is a mandate and the work is process (three of the user's own builds)
-grades `adjacent` on the AI lens, as the rubric says ("directed rather than done") — right or too low? (2) three
-forward-deployed-engineer postings got `adjacent` on the strength of familiar tooling although the core job is
-agent-framework engineering, which the boundary says is `wrong` — tighten the prose or accept.
+BOTH other lenses (§18.7 bar was 67%). **Settled with the user the same day (rubric version now `2db752057726`; the 40 pilot labels predate it and will
+regrade in the next batch):** (1) evaluating AI / automation / RPA opportunities and building the business case
+(time-and-motion hours × wage rates, go/no-go bars set before the pilot) is a `bullseye` on the AI lens, so the
+process-transformation roles with an AI-evaluation duty in Required are bullseye, not adjacent; RPA and
+process-mining platforms are a blocker to name, never `wrong` alone. (2) An engineering seat whose Required block
+asks for production code, years of software/ML engineering, or building and deploying LLM/RAG/agent applications
+is `wrong` on the AI lens even when the duties list evals and adoption (the forward-deployed-engineer postings,
+confirmed by reading their Required block); the rubric now states the line as creating/engineering the AI system
+versus teaching an existing model a job. (3) Level: "executive director" stays out_of_reach by default;
+managerial years are two-tier — over `LEVEL_MANAGERIAL_YEARS_MAX` (personal 2) is one scope hit (stretch_up), at
+or over `LEVEL_MANAGERIAL_YEARS_OUT` (personal 5) is two (out_of_reach on its own). Rules version `2026-09-17.2`.
 
 **Reports.** `Jobs_Found` and the lens lists order in_range → stretch_up → unknown → score; out_of_reach / too_low
 never take a block or a top-table row and sit in a collapsed `<details>` tail; `Level` column everywhere; a fourth
@@ -61,10 +67,18 @@ Chief of Staff out_of_reach → stretch term; the CSV loader opened the BOM-carr
 (every posting_id would have read blank); the `lenses` AI count skipped the decided/tracker filter the other three
 use; the report fixture's "Senior Director" titles are now "Senior Manager" (they are meant to reach a block).
 
-**Next (§20.4 order):** fresh `sweep_ats.py` ingestion → `rescreen-all` (fills `level_fit` / rules `2026-09-17.1`)
-→ coverage re-baseline on the fixed splitter → Phase 4 (Gemma cap 100/day, application-skill cap 10). Then the
-AI-term subset regrade (+100-row control) once the two §21 questions are settled, then `train --lens ai`. Pushing:
-24 local commits unpushed; ask the user; `.personal_patterns` scan baseline is still 3 lines.
+**Next session, in order (§20.4):**
+1. Fresh `sweep_ats.py` ingestion (the ~760 unreachable partitioned reqs, Workday clamp fix, `detail_attempts`).
+2. `finder.py rescreen-all` — fills `screens.level_fit` on the corpus (rules `2026-09-17.2`); then
+   `SELECT * FROM vw_level_agreement` should reproduce the 20/22, and spot-check `US Off-Site` / `#LI-Remote` rows.
+3. Coverage re-baseline on the fixed splitter (`coverage --calibrate`; every number in `COVERAGE_EXPERIMENTS.md`
+   predates the splitter fix).
+4. §21 step 2: `judge export --pools ai_title --relabel` for the 40 pilot rows under the new rubric, plus the
+   AI-term subset (estimate 11,929 active JDs mention an AI term — sample, do not regrade all) + a 100-row
+   stratified control; measure independence; then `train --lens ai`; then the corpus decision.
+5. Phase 4 (Gemma cap 100/day, application-skill cap 10, both in `profile_local`).
+The user still owes the 73 `needs_you` rows in the vault re-export (§20.5). Everything is pushed as of
+2026-09-17; the `.personal_patterns` scan baseline is still 3 lines — run it before every commit.
 
 ## PREVIOUS NOW — audit repairs landed, models retrained on grouped folds, corpus rescreened (2026-09-17, Fable)
 **Read first:** the audit is in the vault, `Professional/Areas/Job_Search/Tools/Jobsearch_Audit_20260917.md` (it names
