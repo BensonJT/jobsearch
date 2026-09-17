@@ -53,6 +53,16 @@ matches to shortlist resume bullets for the job application skill (Keystone vaul
 `Professional/Areas/Job_Search/Tools/IDEA_Coverage_Bullet_Selection.md`). Prerequisites: matches must carry `bullet_id`
 (bullet source `ref_columns` is position + project today), keep every requirement's top evidence rather than the top 5
 per posting, and a `--jd-file` entry point for JDs that are not swept postings.
+(e) **A third grading lens for AI work (raised by the user 2026-09-17).** The judge grades two lenses today
+(`grade_process`, `grade_technical`; `LENS_VIEWS` in `features.py`, prompt in `rubric.py` + `rubric_local.py`). Roles
+built on applied AI — enablement, adoption, governance, agentic workflow delivery — have no lens of their own, so they
+land as `wrong` on both. Worked example: Navy Federal *Principal AI Engineer (Agentic AI)*, req 31189 (posting
+`101023530e516abcfd93`) — judged `wrong`/`wrong`; the user's read is a PARTIAL fit on AI skills, not strong enough to
+apply (hands-on Azure AI Foundry, distributed Python services, AI security threat modeling, 7–10 yrs in AI). The lens
+must separate AI-enablement/delivery roles (a real fit) from hands-on AI platform engineering seats (still out of
+lane), and respect the coding-assessment constraint. Needs: an `ai` lens block in the rubric, `grade_ai` in the label
+schema + a `vw_label_set_ai` view, a regrade of the labeled corpus (~3,000 postings through the Sonnet batch judge), and
+a third lens model. Design with the user before building.
 Then: the report-feedback review (`level_fit` column) and the QUEUED level ceiling below.
 
 **Push state:** everything since `9b2e7a2` is local and unpushed (`72167e5` onward). Ask before pushing; run the
