@@ -1,5 +1,131 @@
 # Session Status — Jobsearch
 
+## Part A: fifth TF-IDF model `bullseye` (schema v15) — trained, gate PASSED, backfilled (2026-09-19, Sonnet)
+**What it is:** among postings already in the candidate's lanes, is this a BULLSEYE rather than merely
+ADJACENT? `vw_label_set_bullseye` (store.py) takes the best of the three per-JD lens grades
+(bullseye > adjacent > stretch > wrong); label 1 = bullseye, 0 = adjacent, `stretch`/`wrong`/ungraded rows
+excluded outright (a different question, already answered by the lens models). `features.BULLSEYE_MODEL`,
+kind `tfidf_lr_bullseye` -- NOT a lens: never in `LENSES`, never returned by `load_lens_models`, never reaches
+`content_fit`/`combine`/verdict/tier/final_score/lens_value/lens_best/lens_bucket/lens_breadth. Stored as
+`screens.fit_bullseye`, reported only.
+
+**Gate (employer-grouped OOF AUC via `required_embed._employer_folds`, reused): 0.825, need >= 0.78 -- PASS.**
+Shuffled-label sanity 0.491 (expect ~0.5, confirms no fold leakage). n_pos=226 (bullseye), n_neg=696 (adjacent).
+Text-grouped 5-fold CV AUC (features.train's own metric, NOT the gate) was 0.833 -- close to the employer-grouped
+number this run, unlike the earlier embedding experiments where employer memorization inflated AUC 7-14 points;
+that gap simply happened to be small here, not a reason to skip the employer-grouped check on a future retrain.
+
+**How to run:** `finder.py train --lens bullseye --report` (trains + prints the gate block; refuses to let
+`bullseye-backfill` proceed if the gate fails, by writing `auc_employer_grouped_passed` into `models.notes`),
+then `finder.py bullseye-backfill` (one-time, UPDATEs `screens.fit_bullseye` on the LATEST row only, for active
+non-rejected postings with best TF-IDF lens prob or `lens_best` >= 0.5 -- 1,059 of 1,059 candidates had JD text
+and were updated on this run). A future normal rescreen (`finder.py rescreen-all`) also fills it via
+`pipeline.bullseye_scores`, making the backfill a one-time bridge until then.
+
+**Rank feed formula (`vw_lens_fit`, SQL only):** for rows where ALL THREE lens grades are NULL (nobody has
+judged the lane), `fit_bullseye IS NOT NULL`, and `lens_best >= lens_strong_p()` (0.70) -- i.e. a strong but
+totally unjudged lane -- the `rank_score` formula's `0.8 * lens_best` term becomes
+`0.8 * ((lens_best + 0.75 + 0.25 * fit_bullseye) / 2.0)`. Rationale: a judged lens is worth 0.75 (adjacent) to
+1.0 (bullseye); an unjudged strong lens was worth only its raw probability (which cannot tell bullseye from
+adjacent -- see the `lens_standout_p` comment); this maps `fit_bullseye` onto that same 0.75-1.0 scale and
+averages it with the lens probability. `lens_value`, `lens_best` itself, the `lens_best < lens_strong_p()` zero
+gate, and `lens_breadth` are all untouched -- verified by test (any single judged grade, or a row below the
+strong threshold, is bit-for-bit identical with or without `fit_bullseye`). `fit_bullseye` is now a column of
+`vw_lens_fit`; `rank_why` adds `'bullseye ~0.NN (model)'` for the same population when `fit_bullseye >= 0.5`;
+report.py's two lens-list tables (`write_lens_lists`) gained a "Bull" column beside Required/Embed. Only 21
+active rows currently sit in this exact population (fully unjudged + strong + `fit_bullseye` present) -- most
+of the 1,059 backfilled rows already carry at least one lens grade, which is why the rank effect is visible on
+few rows today but will grow as more strong-but-ungraded postings accumulate. Mean absolute `rank_score` change
+among those 21: ~47 points (small-n; several were near-zero `lens_best` boundary cases where `fit_bullseye` was
+low, pulling the boosted term below the plain `lens_best` term).
+
+**Learns the JUDGE's bullseye, not an independent ground truth.** Human-gold check (report only, never
+trained on): the user's 38-net-new-graded-row blind sheet (Wave1 + Wave1_R4/R5 + Wave2 Unicorn, later files
+win on duplicates, 99 unique posting_ids total with a human_grade) shows the judge's `bullseye` label has
+**full recall but only about one-third precision against the user's own blind bullseye calls** -- i.e. every
+posting the user personally called bullseye, the judge had also called (at minimum) adjacent-or-better, but
+most of what the judge called bullseye, the user graded lower. The misses are concentrated in **Required-block
+failures** (a role whose FUNCTION reads as a perfect bullseye but whose stated requirements the user does not
+clear), not lane-classification errors -- the judge is good at "what kind of work is this", weaker at "does he
+clear this posting's own bar". AUC of `fit_bullseye` against these human grades: bullseye vs adjacent 0.755
+(n=29), bullseye vs everything else 0.778 (n=99) -- consistent with, not independent confirmation of, the
+above (small n; 80 of the 99 rows were in the bullseye training set and scored with the stored, non-OOF
+`fit_bullseye`, a mild upper-bound caveat on those numbers).
+
+## Part B: two screen-rule defects from blind grading — IMPLEMENTED, NOT YET RESCREENED (2026-09-19, Sonnet)
+Two defects the user's blind grading surfaced in `backend/screen.py` / `backend/profile.py`. Both are coded
+and table-tested with synthetic sentences; **no `screens` row has been written by this work** -- a dry run
+only (see counts below), pending the orchestrator's decision to run one real rescreen.
+
+**B1 -- held clearance.** A confidently HELD clearance requirement is now a screen REJECT reason (leaves the
+rank), not merely a flag that the rank never read. `backend/screen.py`'s new `clearance_call()` resolves the
+question per-anchor with proximity (`P.CLEARANCE_PROXIMITY` = 120 chars) rather than a blob-wide search: an
+"ability to obtain" phrase only counts as sponsorship when its object names the SAME clearance term (or the
+generic word "clearance"), not when it only names a nearby "polygraph" while a TS/SCI is separately stated as
+required-to-start -- the exact bug that used to launder "TS/SCI ... with ability to obtain a polygraph" into
+"reachable". A structured `Minimum Clearance Required to Start:` field is definitive on its own unless its
+value is empty/None/Not Applicable. New patterns recognized: the structured-start field, "ACTIVE and
+MAINTAINED" with intervening words before "clearance", "Clearance Required : Active ...", "... with Poly
+required", "Secret clearance is required", and "active Public Trust" (added `public trust` to
+`CLEARANCE_TERMS`, as a new "conditional hard level" requiring `active` nearby -- a bare "Public Trust"
+mention alone stays reachable/ambiguous, unlike TS/SCI-class terms). A hard term stated as merely
+preferred/nice-to-have is `'ambiguous'` (flag, never reject). The two roles the original clearance fix rescued
+on 2026-09-16 (CACI, Guidehouse) were re-verified to still pass through as sponsored/reachable.
+
+**B2 -- non-remote postings read as remote.** `_remote_in_context` now excludes five boilerplate shapes that
+mention a REMOTE_TERMS word without asserting THIS posting's own workplace: explicit negation ("not a remote
+position", "telework eligible: no"), a generic three-way enumeration ("designated as on-site, hybrid or
+remote"), a policy glossary explaining what "remote" would mean IF the posting were tagged that way, a
+pay-transparency paragraph listing "remote workers" as one of several geographic comp bands, EEO/benefits
+boilerplate, a bare section heading ("Remote" alone, split off from its explanatory sentence by the
+line-splitting regex), and "virtually"/"virtual interview" (communication mode, not location) -- `virtual
+teams` was already excluded as duty vocabulary, now generalized. **Amendment mid-session:** conditional
+phrasing ("remote work may be considered for the right candidate", "remote will be considered") is a GENUINE
+possible-remote fact, not boilerplate -- it still counts as remote (no reject) and now also emits an
+unpenalized flag `remote is conditional ("...") -- verify` (`conditional_remote_phrase()`,
+`UNPENALIZED_FLAG_PATTERNS` entry `^remote is conditional`).
+
+**Diagnosis of the three blind-graded rows (unicorn CSV rows 14/29/30):**
+- RTX "Digital Technology Business Execution Lead" (Tucson, AZ; human note "not commutable") -- tripped the
+  three-way enumeration: "...regardless of whether the role is designated as on-site, hybrid or remote."
+- Booz Allen "AI Adoption Specialist" (Atlanta, GA; human note "not remote") -- tripped a bare "Remote" section
+  heading (split from "If this position is listed as remote, ...") AND separately "employees working
+  virtually"/"in person or virtual" (communication-mode "virtual", not the job's location).
+- T. Rowe Price "AI Process Transformation Lead" (Baltimore, MD; human note "not remote") -- tripped a
+  pay-transparency paragraph: "$122,000 - $209,000 for the location of: Maryland, Colorado, Washington and
+  remote workers."
+
+All three now correctly reject on "not remote and outside the commute area (per listing)" in the dry run.
+
+**Dry-run counts (B3, no writes to `screens`)** -- population: active, verdict != reject, best TF-IDF lens
+prob or `lens_best` >= 0.5 (1,059 rows), compared against a TRUE pre-patch baseline (captured via `git stash`
++ `rules.screen_row` + `pipeline.apply_content_gate`, reusing each posting's already-stored, patch-unaffected
+lens/model fit values, to isolate exactly the clearance/remote rule changes from anything else):
+- candidate/review -> reject: **clearance 170**, **remote 50**, unexplained 0
+- reject -> non-reject: **clearance 0** (structurally impossible -- the OLD code never rejected on clearance,
+  only flagged it), **remote 0**, unexplained 0
+- clearance change would newly un-flag (no longer "must already be held", but not rejected either -- e.g. a
+  hard term whose only "obtain" was previously mis-governing it, or preferred/nice-to-have wording newly
+  recognized as ambiguous): **8** rows
+- rows whose remote status rests ONLY on conditional phrasing ("will/may be considered"): **0** in the current
+  1,059-row population (the pattern exists and is tested, just not present in today's corpus text)
+- gold-sheet cross-check (4 CSVs, 99 unique posting_ids, 11 with a clearance/"not remote"/"not commutable"
+  note): all 3 target rows (RTX, Booz Allen, T. Rowe Price) now reject on the remote reason; 2 clearance-noted
+  rows (an active TS/SCI gap, an active-and-maintained Secret gap) now reject on the clearance reason; 2 rows
+  noted "not commutable" by the user did NOT flip (their location apparently already reads commutable/hybrid
+  under the existing `COMMUTABLE_PLACES`/workplace logic -- outside this fix's scope, worth a follow-up look
+  but not touched here).
+
+Full detail (per-row snippets, top-25 tables per rule, the complete gold-sheet table) is in
+`db/partAB_report_20260919.log` (gitignored) -- not duplicated here since it names employers/postings.
+
+**Tests:** `tests/test_finder.py` gained ~9 clearance tests (structured field, quoted-level, colon-active,
+poly-abbreviation, secret-required, public-trust conditional-hard, bare-public-trust, preferred/ambiguous,
+compensation-boilerplate) and ~10 remote tests (enumeration, glossary, pay-band, negation, virtual-teams/
+remote-sensing duty vocabulary, EEO boilerplate, bare heading, virtual-meeting-mode, true-remote regression,
+conditional-genuine, screen_row-level flag/no-reject, RTX-shaped still-rejects). `tests/test_report_level.py`
+updated for the new "Bull" report column. Full suite: 281 passed.
+
 ## required-embed "second layer" — three audit defects fixed, retrained, rescored (2026-09-19, Sonnet)
 **What it is:** `backend/finder/required_embed.py` (schema v14, table `required_embed`, view
 `vw_required_embed_latest`) is a SECOND, independent estimate of the same question `screens.fit_required`
