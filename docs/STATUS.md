@@ -6,6 +6,46 @@ git history is the changelog._
 
 **Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **194** passing before this session's changes; see the full-suite line below for after.
 
+## OVERNIGHT RE-JUDGE — RESUME HERE (written 2026-09-18 ~22:40 for a post-`/clear` session)
+**User's standing instruction:** run the Sonnet re-judge through the night without waiting for his grading; his token
+window refreshed 22:29 and refreshes again ~03:30, then every 5 h. Fable (or whichever model runs the loop) only
+orchestrates; every judge is a Sonnet subagent. **Do NOT import results, train, re-tune the rubric, or edit
+`rubric.py` / `rubric_local.py` during the run. Do NOT use the Workflow tool for judges** (a relayed user message
+once derailed all eight); use plain `Agent` calls with `model: "sonnet"`.
+
+**What is staged (all rendered under rubric `374acb0addae` = R3 lens text + the separate `required_fit` /
+`required_unmet` output; batch dirs are gitignored):** `db/batches_rejudge_p1_R5_20260918` never-judged live postings,
+713 / 51 batches · `..._p2_...` every old label not `wrong` on either lens, 1,435 / 103 · `..._p3_...` both-`wrong`
+labels with AI in the title, 133 / 10 · `..._p4_...` both-`wrong` labels with AI only in the body, 418 / 30. Total
+2,699 postings, 194 batches, ~12.5M Sonnet tokens. (`db/batches_rejudge_w1_R5_20260918` = the first 112, already judged.)
+Queue filters applied at render: near-duplicate collapse, non-US primary location skipped (p2–p4 skipped 252 old
+labels that way — those labels stay on the OLD rubric: exclude them from training or decide later).
+
+**Loop, one iteration:**
+1. `cd ~/jobsearch && .venv/bin/python db/batches_rejudge_tools/pending.py 8` → prints done / pending and up to 8 `NEXT <dir>/<batch>` lines.
+2. `pending 0` → run `db/batches_rejudge_tools/audit.py`, append the totals to the vault `Tools/Rubric_Experiments.md`
+   and to this file, update the memory `project_jobsearch_rubric_eval_20260918`, END the loop. Nothing else.
+3. Otherwise launch ONE Sonnet `Agent` per `NEXT` line, all in one message. Prompt = the text of
+   `db/batches_rejudge_tools/judge_brief.txt` with `{BATCH}` replaced by the `<dir>/<batch>` value. Nothing added.
+4. When all have reported, go to 1. `pending.py` re-validates every result file itself (ids vs manifest, lens grades,
+   `required_fit`); an invalid or missing result is simply offered again. If the SAME batch comes back invalid three
+   times, add its `<dir>/<batch>` line to `db/batches_rejudge_tools/skip.txt` and note it here.
+5. **Usage limit / rate-limit failures:** do not retry in a tight loop. Schedule the next wake-up for a few minutes
+   after the next refresh (~03:35, then +5 h); the wake-up delay caps at 1 h, so chain no-op wake-ups until then.
+6. Every 5 groups run `audit.py`. STOP and write why if lens-surfaced leaves 15–65% for a pool, if `required_fit`
+   collapses to a single value, or if more than 1 batch in 8 is coming back invalid.
+7. Keep messages to one line per group. No commits are needed during the run (results live in gitignored dirs).
+
+**After the run (needs the user):** (a) importer + schema column for `required_fit` / `required_unmet` (Sonnet coder,
+Fable audits, back up the DuckDB file before migrating) → import → `finder.py train` per lens with before / after AUC
+(main was 0.945); (b) tune the SELECTION formula downstream against his gold — provisional best on 41 tuning rows:
+(2+ lenses >= adjacent AND required_fit != fails) OR (any lens >= adjacent AND required_fit == meets), 32/41 same
+side, all 4 of his bullseyes kept; fresh blind sheet waiting in the vault: `Tools/Wave1_Spot_Gold_Sheet_R5_20260918.csv`
+(do not show him judge grades for those rows first); `db/batches_rejudge_tools/score_gold_r5.py` scores the two
+earlier sheets; (c) move the report to the end of the pipeline with the level / location gates applied to the
+top-jobs list; (d) open pipeline items: JD splitter tags boilerplate `[required]`; whether the screen's "one US
+location anywhere keeps it" rule should tighten.
+
 ## NOW — rubric tuned against gold, label-preservation fix landed, wider re-judge WAITING on the user (2026-09-18, Fable)
 **Nothing from this session is committed.** Working tree: `backend/ats/store.py`, `backend/finder/feedback.py`,
 `backend/finder/rubric.py`, `finder.py`, `tests/test_feedback.py`, new `backend/finder/reanchor.py`,
