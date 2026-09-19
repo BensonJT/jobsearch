@@ -1,5 +1,38 @@
 # Session Status — Jobsearch
 
+## 2026-09-19 evening: gold-sheet ingest (`gold-ingest` branch, Sonnet worker; NOT YET MERGED)
+**`finder.py feedback ingest PATH [PATH...] [--manifest FILE] [--basis blind|seen] [--dry-run]
+[--accept-proposed]` (`backend/finder/gold_ingest.py`), no schema change.** Detects the vault's five gold-sheet
+header shapes (F1 golden wide -- delegated to `feedback.load_csv` unchanged; F2 narrow spot-check; F3 blind-
+sheet shape; F4 single-lens AI grade; F5 derived train/frozen split -- always refused), normalizes `level_fit`
+through a logged alias table, rejects a bad enum value per-row (file continues), requires an explicit `basis`
+for F2/F3 (no default), and merges precedence when a posting is graded more than once: later file wins
+grade/level/note, an earlier `required_fit` is never overwritten by a later row that lacks one, and `basis`
+never moves `blind` -> `seen` or back (conflicts reported, not resolved silently). A `proposal_confidence`
+header (the "proposed required calls" file) refuses without `--accept-proposed`. F4 (single-lens AI grade)
+parses and validates for the `--dry-run` report but is never written live: `llm_labels.lens_grade_source` is
+one flag for the WHOLE row, not one per lens, so a human `grade_ai` cannot be recorded without either
+laundering an unasserted overall grade as human-adjudicated (the exact defect §22.3 Gap 2 already fixed once)
+or overwriting an existing `required_fit`/other lens grade on a PK collision -- needs a schema change (e.g. a
+per-lens `*_grade_source` column) this branch may not make. `feedback.write_records` + `_report_feedback_row`
+factored out of `feedback.py`'s insert so `blind_sheet.import_sheet` and this module share one write path
+(removed `import_sheet`'s old temp-CSV-file detour to `load_csv`; its behavior and tests are unchanged).
+`seen` is written literally as `'seen'`, matching `finder.py mark`'s actual convention and its own test
+(`test_mark_basis_default_seen_and_blind_view_filters`), not the stale `jd_read` schema comment that no write
+path has ever produced. `docs/gold_manifest.example.csv` ships with invented filenames; the real manifest
+lives outside the repo. Tests: `tests/test_gold_ingest.py`, 24 new. **Not run against the live DB or the vault's
+real CSVs.**
+## 2026-09-19 evening: §25 LLM second judge BUILT-NOT-RUN, schema v18 (branch `second-judge`)
+**No live API call has been made.** `backend/finder/judge2.py` (schema v18: `judge2_reviews`, `judge2_evals`,
+`vw_judge2_latest`, `vw_judge2_eval_latest`), CLI `finder.py judge2 run|eval|status`, `pipeline.judge2_stage`
+wired into the dead `llm_top` hook (still requires `JUDGE2_LIVE_OK=1` even when `--llm-top` is passed), and
+`vw_lens_fit` rank integration (`effective_required_value`/`effective_required_source`, `judge2_required`,
+`judge2_unmet_first`, `judge2_held_clearance`, `judge2_moves_rank`; the "J2" report column beside "Bull"). 26
+new tests in `tests/test_judge2.py`, all passing with a fake transport/sleep -- no network, no clock. See
+sprint plan §25's "as built" note for what differs from the proposal, and the report this session's builder
+handed back for the full deviation list, schema assumptions, exact payload fields, and open risks (Gemma JSON
+mode support, header auth shape, token limits) that cannot be verified without a live call.
+
 ## 2026-09-19 afternoon: rescreened, five branches merged, schema v17 (Fable orchestrating Sonnet workers)
 **State of the database after the last rescreen (rules `c4375029121a`):** candidate 242, review 1,021, reject 78,627 of 79,890 active. Coverage and `required-embed score` ran after it; `finder.py top` written. Tests **394** passing. Database backup taken before the v16 migration.
 
