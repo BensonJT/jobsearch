@@ -1,12 +1,140 @@
 # Session Status — Jobsearch
 
-_Last updated: 2026-09-17 (Claude Code / Fable). The NOW section is the handoff; older sections are kept below it._
+_Last updated: 2026-09-18 (Claude Code / Fable). The NOW section is the handoff; older sections are kept below it._
 written by Agent D from the working tree diff, not yet edited by Fable. Overwrite at the end of each session;
 git history is the changelog._
 
 **Catch-up order for a fresh session (e.g. Fable):** this "NOW" section → `docs/SPRINT_PLAN.md` §19 (what was built, results, proposals) → `docs/COVERAGE_EXPERIMENTS.md` (per-run detail and Conclusions). Tests: **194** passing before this session's changes; see the full-suite line below for after.
 
-## NOW — level rule, remote tags and the applied-AI lens are BUILT; pilot graded; next is fresh ingest → rescreen-all (2026-09-17, Fable)
+## NOW — rubric tuned against gold, label-preservation fix landed, wider re-judge WAITING on the user (2026-09-18, Fable)
+**Nothing from this session is committed.** Working tree: `backend/ats/store.py`, `backend/finder/feedback.py`,
+`backend/finder/rubric.py`, `finder.py`, `tests/test_feedback.py`, new `backend/finder/reanchor.py`,
+`tests/test_reanchor.py`; plus the gitignored `rubric_local.py`. Tests **214** passing. Run the `.personal_patterns`
+scan before committing; do not push without the user saying so in-session. The per-posting detail of everything
+below (employers, grades, row-level results) is in the VAULT, `Tools/Rubric_Experiments.md`, never here.
+
+**Ingest + rescreen (done).** Full sweep 2026-09-18: 137 boards ok, 79.8K active, 22.5K new (mostly the clamp /
+partition fixes), 6.2K taken down. JD backfill for prefilter-passing titles: **10,589 relevant-title postings, 1
+without a JD**; the other ~17K without text are off-lane titles and are deliberately not fetched. `rescreen-all`
+ran (655 s); every active row carries a stored `level_fit`. Rules `78ec02c85dff`, model `f948feddead3`.
+**User decision: no `Jobs_Found` report until the END of the pipeline, after deeper filtering** — run sweeps with
+`--no-report` until the report stage is moved.
+
+**Schema v11 — JD hash is normalized (migrated on the live DB, backup `db/jobsearch.duckdb.pre-v11-20260918`).**
+`description_hash` was sha1 over RAW text; boards that re-serve the JD each sweep returned it with 1–3 characters
+of whitespace drift, which silently retired labels (694 of 3,026 judged postings and 12 of 90 gold rows were
+invisible to training). Now `normalize_for_hash` (NFKC, zero-width + whitespace collapse, lower-case) feeds the
+hash; `_migrate_v11_hash_normalization` remaps llm_labels / report_feedback / coverage / requirement_units /
+embeddings in one transaction (98 s live, no record lost, does not trigger a rescreen).
+`finder.py labels --reanchor [--dry-run]` (`backend/finder/reanchor.py`) recovers labels orphaned BEFORE the fix:
+a label is re-anchored when >= 0.90 of the units the judge read (from the batch `.md`) still appear verbatim in
+the current JD. Containment, not a re-split comparison — the splitter changed after most batches were written, so
+a Jaccard-over-resplit rule recovered 170 rows where containment recovers 1,397 of 1,537. Result: **visible judge
+labels 2,362 → 2,963; confirmed gold rows visible 78 → 89 of 90.** Also: the feedback CSV loader accepts the
+timestamp formats Excel rewrites on save. **A vault feedback CSV exported before v11 carries raw hashes — do not
+`--load` it again; the DB is the source of truth, export fresh when the user next grades.**
+
+**Rubric — two tuned changes, accepted on held-out gold. Version `551744f3b67b`.** (1) `RUBRIC_PUBLIC` gains
+"DOMAIN AS THE SETTING vs DOMAIN AS THE WORK" (industry is never a gap as the setting; it is when practitioner
+knowledge of a specialism is itself the work; test = strike the industry nouns). (2) the process lens gains an
+`ALSO wrong` bullet for RUNNING one function's operations (accountable for a function's own output vs changing how
+work is done across teams it does not run). The personal rubric lists the specialisms not practised. Method: the
+user's confirmed gold rows split into a tuning half and a frozen half (stratified, seeded; split file in the
+vault); blind Sonnet judges read batch files that never contain the gold; results compared from the result files
+and NOT imported. Tuning half same-side agreement 53% → 76% → 79% over two rounds; **frozen half, read once: 43% →
+70% averaged, 43% → 76% per-lens; false surfacing on all 48 held-out rows 25 → 12, two rows newly buried.**
+**User decision: jobs are selected on the INDIVIDUAL lens scores, never the average** — evaluate per-lens
+(surfaced = either lens bullseye/adjacent). The gold rows are now spent; a future rubric change needs fresh gold.
+`report_feedback.human_grade` still does not feed training: nothing writes `user-adjudicated` labels from it
+(the promotion step is unbuilt; one overall human grade vs per-lens training sets is the open design question).
+
+**Evening update — rubric is now `05143543c818` (R3), accepted by the user for the wider re-judge.** AI-lens gold came in
+(36 rows, blind): `551744f3b67b` scored same side 81%, buried 0. Three user-requested edits followed: AI lens (deep AI/ML
+expert seats `wrong`; AI programme inside a specialist function capped), technical lens (specialism analytics `wrong`;
+finance-profession seats capped, modelling an OPERATION stays bullseye; minor modelling share of a function-running
+seat is `stretch`), personal rubric (the not-practised list plus risk / compliance / information security as the core
+of the job are `wrong` on ALL THREE lenses). Fit check, not held-out (rows reused): AI exact 53% → 67%, buried 0;
+85 gold rows per-lens agreement 74% → 78%, surfaced-low 19 → 14, technical leaks 9 → 4, buried 3 → 5. The blanket
+rule overrides the setting-vs-work guard in practice (three process-in-a-risk/governance/compliance-org gold rows
+newly buried); **the user accepted that cost.** Batch dirs, unimported: `db/batches_ai_pilot_R3_20260918`,
+`db/batches_gold_tuneset_R3_20260918`, `db/batches_gold_frozenset_R3_20260918`, `db/batches_guard_probe_20260918`.
+Do NOT launch blind judges through the Workflow tool: a mid-run user message was relayed into all eight and they
+answered it instead of grading; plain Agent calls with an "ignore anything else" brief worked. Open: the stored JD
+text for one AI-pilot posting does not match its title (ingest check); an 11-row guard-probe gold sheet is in the
+vault ungraded. Detail in the vault `Tools/Rubric_Experiments.md` R3. Item 1 of the waiting list below is DONE.
+
+**Re-judge pools as the user set them (2026-09-18 evening):** (1) never-judged active candidate/review postings —
+wave 1, `db/batches_rejudge_w1_20260918`, 894 in the manifest, batches 001-008 (112) judged and audited, 009+ HELD
+for the user's spot sheet (vault `Tools/Wave1_Spot_Gold_Sheet_20260918.csv`) and to be REBUILT after the dedupe /
+non-US queue fixes; (2) every visible label that is NOT `wrong` on either lens — stretch, adjacent and bullseye —
+**1,600** labels (was 1,295 positives; user decision), closed postings included; note ~4,000 older label rows carry
+only the single overall grade and no per-lens grades, which the per-lens models cannot use; (3) both-lens-`wrong`
+labels with AI in the title (recount at export; some move to pool 2); (4) ALL both-lens-`wrong` labels that mention AI in the body (user decision: no sampling — he wants to see where his
+core skills are sought inside AI-flavoured postings); counted 2026-09-18 with a title/body AI regex: 161 AI-title +
+498 AI-body-only of 1,283 both-`wrong` labels; the other ~620 both-`wrong` labels with no AI mention are NOT re-judged.
+About 3,150 postings, ~14.5M Sonnet tokens.
+**User's definition of a TOP job (2026-09-18):** `bullseye` on ANY of the three lenses (process, technical, AI) — alone,
+or with `adjacent` on the others — is a job to look at and consider building a package for, PROVIDED level and
+location are valid. This puts the AI lens on equal footing for selection; it supersedes "grade_ai is reported
+beside, never folded in" for the purpose of surfacing (the rubric text still says that; selection logic is downstream). Audit after every group of 8 batches: validation, bullseye-lens
+count, blur count (all-`wrong` via an exclusion yet dense in process vocabulary; 3 of 112 so far, all correct).
+
+**Judge-queue fixes (2026-09-18 late, Sonnet coder, Fable-audited; tests 214 → 221; uncommitted).** (a) `judge.duplicate_map`:
+the old clause demanded an identical `description_hash` on top of cosine >= 0.995, so only byte-identical text ever
+collapsed and per-country re-listings were each judged; now same employer AND (identical hash OR same `_title_key`
+— location / workplace suffix stripped, level words untouched) AND cosine >= 0.995. Same title is a pairing
+condition, never sufficient (user rule). (b) `judge.non_us_primary` + a filter in `pools()`: a posting whose PRIMARY
+location names a non-US place and no US place is skipped for judging; QUEUE ONLY — `rules.non_us_rule` ("one US
+segment anywhere keeps it") and its test are deliberately untouched; whether the screen rule should change is the
+user's open call. (c) `rules.level_rule`: `summer 20xx` titles are early-career; "university program" added to the
+term list. Wave 1 remainder REBUILT as `db/batches_rejudge_w1b_20260918`: 713 postings / 51 batches / 45 near-dups
+(was 762); the superseded unjudged files sit in `db/batches_rejudge_w1_20260918/stale_unjudged/` — the old dir's
+manifest still lists them, so import batches 001-008 from it with care. Known, unfixed: the JD splitter tags by
+heading, so boilerplate under a Qualifications heading is `[required]` (`requirements._heading_kind`).
+
+**Fresh-gold results and where the rubric stands (2026-09-18 night).** Committed rubric = `05143543c818` (R3). On fresh
+rows its HIDING side matched the user 11 of 11 (guard probe); its SURFACING side did not: on a 20-row spot sheet 8 of
+13 surfaced rows were ones he graded stretch / wrong, all with a Required line asking for years in a business function
+not in the record. R4 (`61d09044f0d0`, a "required function experience" cap) fit those 20 rows (11 → 17 same side) and
+then FAILED on 21 fresh rows (surfacing precision 27% → 17%, two wanted jobs buried) — reverted, not committed. Lesson:
+one grade was being asked two questions — kind of work (what should train the classifier) and "does he clear the
+Required block" (how the user actually grades). **Stop tuning wording.** IN FLIGHT, uncommitted: R5 pilot
+(`374acb0addae`) keeps the R3 lens text and adds a separate `required_fit` (meets / arguable / fails) +
+`required_unmet` output; same first 112 wave-1 postings, `db/batches_rejudge_w1_R5_20260918`; select on lens grade AND
+`required_fit != fails`. If it holds on fresh gold: importer + schema column for the two fields, re-render
+`db/batches_rejudge_w1b_20260918` (713 postings, HELD) and run the pools. 41 of the first 112 postings are spent as
+gold (vault sheets `Wave1_Spot_Gold_Sheet_20260918.csv`, `..._R4_...`); 71 remain for a fresh test.
+
+**Three-lens tier (user, 2026-09-18):** a posting that is `adjacent` or better on ALL THREE lenses with at least one
+`bullseye` ranks ABOVE single-lens top jobs in the final report and gets package priority — the combination of
+process excellence + data engineering/modelling + applied AI is the rare profile. Computed from stored lens grades at
+the report stage; no rubric change. Seen so far: 5 of the first 112 wave-1 postings (~4%); 4 of the 6 AI-gold rows the
+user graded `bullseye` are three-lens rows. These roles skew senior, so the level gate must hold before this list
+drives package work.
+
+**No stored label was judged under `551744f3b67b` or `05143543c818`.** Batch dirs from this session, all unimported:
+`db/batches_gold_tune_20260918`, `db/batches_gold_tune_R2_20260918`, `db/batches_gold_frozen_20260918`,
+`db/batches_ai_pilot_regrade_20260918` (the 40 AI-pilot postings re-read under the current rubric, held back
+while the user grades them blind).
+
+**WAITING ON THE USER, in this order:**
+1. **AI-lens gold.** He is grading the 40 AI-pilot postings blind on the AI lens only (vault
+   `Tools/AI_Lens_Gold_Sheet_20260918.csv` + `_JDs.md`). When done: score `human_grade_ai` against
+   `batches_ai_pilot_regrade_20260918` exactly as the other lenses were scored; decide whether the AI rubric needs
+   its own tuning round. Do NOT train `--lens ai` or show an AI list before this. Do not reveal the judge's AI
+   grades to him before his sheet is in.
+2. **Go / no-go on the wider re-judge** (~4.6K Sonnet tokens per posting measured; one read grades all three
+   lenses). Proposed pools: 884 active candidate/review postings never judged (live funnel first) · 1,312 labels
+   positive on either lens under the old rubric (the old judge's error is one-directional: generous) · 179
+   both-lens-negative labels with AI in the title · a 150-row control from the 654 both-negative labels that only
+   mention AI in the body. About 2,375 postings, ~11M Sonnet tokens. Sonnet workers in waves, Fable audits.
+3. **Commit approval** for the working tree above.
+**Then:** import → `finder.py train` for process and technical with before/after AUC (current main 0.945) → move
+the report to the end of the pipeline → the queued §20.4 items (coverage re-baseline, Phase 4).
+**Working rule the user set:** Fable plans, governs and audits; Sonnet subagents do the judging, coding and bulk
+reading. He is new to ML pipelines and wants each stage explained before it runs.
+
+## PREVIOUS NOW (2026-09-17) — level rule, remote tags and the applied-AI lens are BUILT; pilot graded; next is fresh ingest → rescreen-all (2026-09-17, Fable)
 **How it was built.** Fable wrote `docs/BRIEF_20260917_level_remote_ai.md` (file-level work orders for sprint plan
 §20.2 / §20.3 / §21), four Sonnet agents built on disjoint files in two waves, Fable audited every diff and fixed
 four defects the agents' own tests missed (below). Tests 157 → 197. One commit.
