@@ -1,5 +1,94 @@
 # Session Status — Jobsearch
 
+## required-embed "second layer" — three audit defects fixed, retrained, rescored (2026-09-19, Sonnet)
+**What it is:** `backend/finder/required_embed.py` (schema v14, table `required_embed`, view
+`vw_required_embed_latest`) is a SECOND, independent estimate of the same question `screens.fit_required`
+(the TF-IDF ranking model) answers -- does the candidate clear THIS posting's Required block -- produced by
+stacking three signals: an OOF TF-IDF prob, a bge-base embedding classifier on the posting's own Required
+block, and a per-Required-line "P(unmet)" model rolled up per posting. It is NOT a lens: never read by
+`pipeline.content_fit`, `lens_best`, or any lens count/bucket. It feeds the ONE rank (`vw_lens_fit.rank_score`)
+for UNJUDGED rows only, through `required_value(required_fit, coalesce(embed_required, fit_required))` -- a
+judge's own `required_fit` call always wins over both model outputs, for every row that has one.
+
+**Where it sits in the pipeline:** after `coverage` (needs `requirement_units`), before the LLM Phase 4 stage
+and the `Jobs_Found_*.md` report: `... screen -> coverage -> required-embed -> (LLM) -> report`. It never fails
+the sweep -- no trained model or no embedding library is one log line and a skip.
+
+**How to run it:** `finder.py required-embed train --report` occasionally (only when the judged corpus has
+moved meaningfully -- this run took ~23 min wall time on this machine, 8 cores / 7 GB RAM / CPU only, mostly
+one-time bge-base encoding of newly-seen Required-block text; a same-corpus retrain with a warm embedding
+cache under `db/models/required_embed_cache/` is minutes, not tens of minutes) and `finder.py required-embed
+score --all` (or bare `score` for incremental) every run, as part of the standard sequence in "Full pipeline
+order" below.
+
+**Scoring population:** active, non-rejected postings with best TF-IDF/lens prob >= 0.5 that have a Required-
+group requirement unit. Screen rejects are deliberately excluded from this population -- the user's ruling,
+not an oversight.
+
+**Caveats that do not go away with a retrain:** it inherits the judge's own blind spots (it is trained to
+match the judge's `required_fit` call, not some independent ground truth), and it goes stale for a given
+posting the moment the candidate's own record changes without a re-judge -- the score reflects "does this
+match what the judge would have said about the OLD evidence record," not the current one.
+
+**The 2026-09-19 audit found three defects in the first build; all three are fixed in this file, verified by
+the retrain below, and worth keeping as lessons:**
+
+1. **Label leak (most important).** The original `score()` gave a genuinely held-out (OOF) score only to the
+   ~680-row lens-surfaced stack-training population; every OTHER judged posting in the scoring population --
+   judged, high TF-IDF, but never lens-surfaced -- got a FULL (in-sample) model score, even though its own
+   `screens.fit_required` label had trained the TF-IDF component and its own quoted unmet lines had trained the
+   line model. Evidence: those rows scored AUC 0.969 against the judge's call, vs. 0.779 for genuinely
+   held-out rows -- a dead giveaway of leakage, not skill. **Fix:** `train()` now computes ONE employer-grouped
+   fold assignment (`fold_of`) over EVERY judged posting up front (not just the lens-surfaced ones), and a new
+   `_broad_oof()` helper trains each fold's model on the (narrower) training population but APPLIES it to
+   every posting sharing that fold, whether or not that posting was in the training population. Every judged
+   posting with a Required block (2,362 of them on this corpus, vs. the old 687) gets a bundle-stored held-out
+   value (`oof_scores` / `oof_components`); `score()` uses that value verbatim (`is_oof=True`, no re-embedding,
+   no full-model inference) for any posting in `bundle["oof_pids"]`, and only ever runs the full models
+   (`is_oof=False`) for a posting that was never judged at train time (or judged only afterward).
+   **Verified:** re-measuring AUC on the real corpus post-fix, the two populations are now close and both
+   plausible -- (a) stack-population (lens-surfaced) judged rows: n=597, AUC=0.746; (b) other judged rows: n=214,
+   AUC=0.778. Neither is anywhere near the pre-fix 0.969.
+2. **Scale mismatch.** The stack's OOF pass called the shared OOF helper with its default
+   `class_weight="balanced"`, while the final, shipped `stack_clf` is unbalanced (`LogisticRegression(C=1.0)`,
+   no class_weight) so its output reads as a calibrated probability near the ~33% base rate. Gate AUC and the
+   reliability table were therefore measuring a DIFFERENT model than the one actually shipped -- reliability
+   was badly miscalibrated (predicted 0.47 -> actual 0.28). **Fix:** the stack OOF pass now runs through
+   `_broad_oof(..., balanced=False, fixed_C=STACK_C)` with `STACK_C = 1.0` fixed and used in BOTH the OOF pass
+   and the final refit (the "fix C=1.0 in both" option, chosen because three raw probabilities as stack input
+   features leave little for a C search to do). **Verified:** the post-fix reliability table (5 bins,
+   mean_pred -> actual_rate) is now close to the diagonal: 0.108->0.118, 0.200->0.169, 0.295->0.243,
+   0.425->0.463, 0.617->0.632.
+3. **Invalid sanity check.** The old shuffled-label check trained the stacker on a shuffled target but
+   evaluated it against the TRUE labels, using features (the block/rollup OOF) that were themselves built
+   from the true labels -- so its reported 0.604 measured nothing about leakage. **Fix:** a real end-to-end
+   check now shuffles the posting-level target ONCE (seeded), reruns the block -> roll-up -> stack OOF chain
+   against that shuffled target (cheap: cached embeddings, so it is just re-fit logistic regressions), and
+   evaluates against the SAME shuffled labels. TF-IDF's OOF and the line model's OOF are reused UNSHUFFLED
+   (retraining those per shuffle is expensive and the leak this check guards against lives in the
+   block/roll-up/stack chain, not there) -- logged explicitly so the scope of the check is never ambiguous.
+   If the resulting AUC is above 0.60, `train()` now stops and does not save a model (`shuffle_leak` in the
+   result dict), rather than shipping on top of a chain that can still predict a randomized target. The gate
+   is only enforced once there are >= 30 stack rows -- below that a shuffled AUC is itself too noisy a
+   statistic to mean anything (true of the test suite's small synthetic corpora, never of the real ~680-row
+   population). **Verified:** real-corpus retrain measured 0.437 (expected ~0.45-0.56; comfortably under 0.60).
+4. **The unexplained "913 -> 874" scoring gap.** `score()` now counts every population row into exactly one of:
+   scored, `skipped_no_units` (no requirement units at all), `skipped_no_rollup` (a Required-group unit exists
+   but fell outside the top-18 "seen" cut, so no line survives for the roll-up), or `skipped_no_tfidf` (no
+   stored `fit_required`). This run: population 913, scored 874 (803 OOF + 71 fresh), `skipped_no_rollup`=39,
+   the other two counters 0 -- fully accounting for the gap.
+
+**Final measured numbers (real corpus, 2026-09-19 retrain, model `389842b0ea8f`):** Target B (lens-surfaced,
+n=680, 221 pos / 459 neg): TF-IDF alone AUC 0.633, stack AUC 0.747 (gate: >=0.71 AND >= tfidf+0.05, both
+cleared), precision@25/50/100 = 0.64/0.66/0.61. Target A (meets vs fails, n=338): AUC 0.861. Shuffled
+end-to-end sanity AUC 0.437. Reliability and the two held-out-AUC splits are above. **Timing:** the `score
+--all` run took 23.9s wall time for 874 rows (~0.027s/row), but that is dominated by a ~15s fixed
+one-time model-load cost (loading the bge-base encoder even though the OOF path for 803 of those 874 rows
+never calls it at all) -- the task brief's ballpark of "~0.12s/posting" does not match what a warm-cache run
+actually costs; the real marginal cost of the OOF path is close to zero (no encoding, no inference: it reads
+a stored number out of the trained bundle), and the "fresh" path's marginal cost is only paid for the small
+number of never-judged-or-freshly-judged postings (71 here) that need real block/line embedding + inference.
+
 _Last updated: 2026-09-18 night (Claude Code / Sonnet, orchestrating; Fable to take over). The NOW section is the handoff; older sections are kept below it._
 written by Agent D from the working tree diff, not yet edited by Fable. Overwrite at the end of each session;
 git history is the changelog._
