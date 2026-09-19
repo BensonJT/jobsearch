@@ -8,8 +8,8 @@
 
 **NEXT, in order.**
 1. **First live evaluation of the second judge: needs the user's explicit go in that conversation.** Follow the runbook in SPRINT_PLAN §25. Disclosed and reviewed so far: provider (Gemini API free tier), models (`gemma-4-31b-it`, then `gemma-4-26b-a4b-it`), the seven payload fields, and the background file, which the user edited and approved (`--background file`; working copy `judge2_background.local.md`, gitignored). The eval-set dry run with that file: 90 postings, about 454K estimated tokens, `prompt_version 0f96faadd498`. Bar: catch >= 70% (fails-or-partial) and agree >= 85% (meets only), over judged rows, with at most 10% unjudged.
-2. **Single-lens human grades have no home.** The AI-lens sheet (one grade per posting, for the applied-AI lens only) parses and validates but is refused at write: `llm_labels.lens_grade_source` is one flag per row, so storing a human `grade_ai` would either assert an overall grade nobody gave or overwrite a Required call. Needs a small schema change (per-lens source columns, or a `human_lens_grades` table that `vw_lens_fit` reads ahead of the judge's lens grade).
-3. `finder.py feedback ingest` and `sheet-import` take `--db` only BEFORE the sub-action (`finder.py feedback --db X ingest ...`); give the sub-subparsers the common parent.
+2. ~~**Single-lens human grades have no home.**~~ **DONE on branch `lens-grades` (schema v19, not yet merged).** See §28. `human_lens_grades` table (posting_id, description_hash, lens, grade, basis, level_fit, note); `ingest_f4` now writes it for real; `vw_label_set_process/technical/ai` substitute a human lens grade for the judge's own on that one lens (source `user_adjudicated`), for the posting's current hash only; `vw_label_set` (the averaged overall grade) and `llm_labels` are untouched.
+3. ~~`finder.py feedback ingest` and `sheet-import` take `--db` only BEFORE the sub-action~~ **DONE on branch `lens-grades`.** The `feedback` sub-subparsers (`sheet`/`sheet-import`/`ingest`) now accept `--db`/`--vault` in either position, via an inner parent parser with `default=argparse.SUPPRESS` so it never overwrites a value the outer parser already set.
 4. Carried over, still open: first real `finder.py retrain`; a per-employer residence note for employers whose hub rule is not in the JD; the weekly retrain as a scheduled step.
 
 ## 2026-09-19 evening: gold-sheet ingest (Sonnet worker; MERGED, see the handoff entry above)
@@ -22,11 +22,12 @@ for F2/F3 (no default), and merges precedence when a posting is graded more than
 grade/level/note, an earlier `required_fit` is never overwritten by a later row that lacks one, and `basis`
 never moves `blind` -> `seen` or back (conflicts reported, not resolved silently). A `proposal_confidence`
 header (the "proposed required calls" file) refuses without `--accept-proposed`. F4 (single-lens AI grade)
-parses and validates for the `--dry-run` report but is never written live: `llm_labels.lens_grade_source` is
-one flag for the WHOLE row, not one per lens, so a human `grade_ai` cannot be recorded without either
-laundering an unasserted overall grade as human-adjudicated (the exact defect §22.3 Gap 2 already fixed once)
-or overwriting an existing `required_fit`/other lens grade on a PK collision -- needs a schema change (e.g. a
-per-lens `*_grade_source` column) this branch may not make. `feedback.write_records` + `_report_feedback_row`
+writes into its own `human_lens_grades` table (schema v19, branch `lens-grades`, see §28) rather than
+`llm_labels` -- `llm_labels.lens_grade_source` is still one flag for the WHOLE row, not one per lens, so a
+human `grade_ai` still cannot be recorded there without either laundering an unasserted overall grade as
+human-adjudicated (the exact defect §22.3 Gap 2 already fixed once) or overwriting an existing
+`required_fit`/other lens grade on a PK collision; the new table sidesteps that instead of fixing it.
+`feedback.write_records` + `_report_feedback_row`
 factored out of `feedback.py`'s insert so `blind_sheet.import_sheet` and this module share one write path
 (removed `import_sheet`'s old temp-CSV-file detour to `load_csv`; its behavior and tests are unchanged).
 `seen` is written literally as `'seen'`, matching `finder.py mark`'s actual convention and its own test
