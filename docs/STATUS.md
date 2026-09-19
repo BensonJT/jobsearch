@@ -1,6 +1,18 @@
 # Session Status — Jobsearch
 
-## 2026-09-19 evening: gold-sheet ingest (`gold-ingest` branch, Sonnet worker; NOT YET MERGED)
+## HANDOFF 2026-09-19 night: second judge + gold ingest MERGED to main, schema v18, 449 tests; NO LIVE LLM CALL HAS BEEN MADE
+
+**State.** main = the merge of `second-judge` and `gold-ingest` (both Sonnet-built in worktrees, both audited by the orchestrator; every defect found is listed in SPRINT_PLAN §25 "Orchestrator audit" and in the gold-ingest entry below). Full suite on main: 449 passed. Live DB migrated to v18 (pre-migration backup kept outside the repo). Nothing is running; no worktrees remain.
+
+**Gold data is in the live DB.** `finder.py feedback ingest --manifest <manifest>` loaded six hand-graded sheets plus the user-confirmed Required calls: 111 postings, 101 `blind` + 10 `seen` (the 10 had an earlier non-blind human grade from the golden CSV, so a later sheet is a second look; the ingest keeps them `seen` and reports the conflict). 90 blind rows carry a human Required call (64 fails / 26 meets). Against the first judge: CATCH set (judge said meets, user said fails) n = 13; AGREE set (user said meets) n = 26; both clear the minimum-n guard of 5. For scale, the first judge called 25 of the user's 64 fails `arguable` and 13 `meets`.
+
+**NEXT, in order.**
+1. **First live evaluation of the second judge: needs the user's explicit go in that conversation.** Follow the runbook in SPRINT_PLAN §25. Disclosed and reviewed so far: provider (Gemini API free tier), models (`gemma-4-31b-it`, then `gemma-4-26b-a4b-it`), the seven payload fields, and the background file, which the user edited and approved (`--background file`; working copy `judge2_background.local.md`, gitignored). The eval-set dry run with that file: 90 postings, about 454K estimated tokens, `prompt_version 0f96faadd498`. Bar: catch >= 70% (fails-or-partial) and agree >= 85% (meets only), over judged rows, with at most 10% unjudged.
+2. **Single-lens human grades have no home.** The AI-lens sheet (one grade per posting, for the applied-AI lens only) parses and validates but is refused at write: `llm_labels.lens_grade_source` is one flag per row, so storing a human `grade_ai` would either assert an overall grade nobody gave or overwrite a Required call. Needs a small schema change (per-lens source columns, or a `human_lens_grades` table that `vw_lens_fit` reads ahead of the judge's lens grade).
+3. `finder.py feedback ingest` and `sheet-import` take `--db` only BEFORE the sub-action (`finder.py feedback --db X ingest ...`); give the sub-subparsers the common parent.
+4. Carried over, still open: first real `finder.py retrain`; a per-employer residence note for employers whose hub rule is not in the JD; the weekly retrain as a scheduled step.
+
+## 2026-09-19 evening: gold-sheet ingest (Sonnet worker; MERGED, see the handoff entry above)
 **`finder.py feedback ingest PATH [PATH...] [--manifest FILE] [--basis blind|seen] [--dry-run]
 [--accept-proposed]` (`backend/finder/gold_ingest.py`), no schema change.** Detects the vault's five gold-sheet
 header shapes (F1 golden wide -- delegated to `feedback.load_csv` unchanged; F2 narrow spot-check; F3 blind-
@@ -22,7 +34,7 @@ factored out of `feedback.py`'s insert so `blind_sheet.import_sheet` and this mo
 path has ever produced. `docs/gold_manifest.example.csv` ships with invented filenames; the real manifest
 lives outside the repo. Tests: `tests/test_gold_ingest.py`, 24 new. **Not run against the live DB or the vault's
 real CSVs.**
-## 2026-09-19 evening: §25 LLM second judge BUILT-NOT-RUN, schema v18 (branch `second-judge`)
+## 2026-09-19 evening: §25 LLM second judge BUILT-NOT-RUN, schema v18 (MERGED, see the handoff entry above)
 **No live API call has been made.** `backend/finder/judge2.py` (schema v18: `judge2_reviews`, `judge2_evals`,
 `vw_judge2_latest`, `vw_judge2_eval_latest`), CLI `finder.py judge2 run|eval|status`, `pipeline.judge2_stage`
 wired into the dead `llm_top` hook (still requires `JUDGE2_LIVE_OK=1` even when `--llm-top` is passed), and
