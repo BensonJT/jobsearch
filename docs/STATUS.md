@@ -1,6 +1,17 @@
 # Session Status — Jobsearch
 
-## HANDOFF 2026-09-20 morning: second judge evaluated live four times, bar NOT met; §29 (line-level contract) specified and being built
+## HANDOFF 2026-09-20 afternoon: §29 line-level second judge BUILT, MERGED, RUN LIVE TWICE; bar still not met, but every miss now names its line
+
+**State.** main = §29 merged (branch `judge2-lines`, Sonnet-built, orchestrator-audited: five defects fixed before merge, listed in SPRINT_PLAN §29), schema v20 (`judge2_lines`; pre-migration backup kept outside the repo), 506 tests at merge plus the derivation tests added after. No worktrees, nothing running.
+
+**Rounds 5 and 6 (prompt_version `0d6b4871f44a`, per-line contract, 90 blind gold rows, `gemma-4-31b-it`, ~106 min per run: the per-line answer takes ~30 s to generate).** 89 reviewed + 1 unparseable in each. As first derived: catch 46% / agree 78%. The stored lines exposed two derivation bugs, fixed in code and re-scored with `judge2 rederive` (no API call): a years line that NAMES a function rated `met` on evidence showing no span of time (a degree sentence) now counts as `unclear`; a degree ladder (Doctorate + 2 years OR Master's + 4 ...) is any-of, not one hard gate per rung. Result: **catch 62% / agree 78%** (bar 70 / 85), 39 of 64 gold unmet lines rated unmet. Both rules were tuned on the evaluation rows, so treat the gain as provisional until new gold rows exist.
+**Noise floor: zero.** Round 6 repeated round 5's prompt under `--run-tag round6`: all 89 raw responses were byte-identical and 0 of 766 shared required-line verdicts differed. At temperature 0 this model is deterministic, so the verdict changes seen between rounds 1-4 were prompt sensitivity, not randomness: every future change is attributable.
+
+**What is left is mostly not code.** The remaining catch misses are or-list years lines where the judge cites real years from the background sheet against a listed generic item while the human call reads the list inside the role's domain; the remaining agree misses are a held-clearance line, a tool named in the title, two lines where the background sheet is silent, and one row capped at `partial` by the dropped-line guard. Two gold `meets` rows got no call at all (the model marked no line `required`): an open parsing gap.
+
+**NEXT.** (1) The user's rulings on the remaining misses; then sheet edits, a possible domain rule, or label changes. (2) The zero-required-lines gap. (3) Consider raising `MAX_OUTPUT_TOKENS` if the one unparseable posting is a truncation. (4) Still open from before: `judge2 status` ignores the background flags; `gold_ingest._merge` blind/seen flaw for `report_feedback`; coverage "no calibration matches the running config"; weekly retrain as a scheduled step.
+
+## HANDOFF 2026-09-20 morning (superseded by the entry above): second judge evaluated live four times, bar NOT met; §29 (line-level contract) specified and being built
 
 **State.** main carries the `lens-grades` + `employer-residence-note` merge (schema v19), the live-call fixes to `judge2.py` (minimal thinking, answer read from non-thought parts, JSON mode, token-aware pacing, `JOBSEARCH_DB` override so CLI tests never open the live DB), two prompt rules (tools; years in an "or" list) and SPRINT_PLAN §29. Live DB is v19 (pre-migration backup kept outside the repo). The single-lens gold sheet is ingested (36 `human_lens_grades`). First real `finder.py retrain` ran: process .931, technical .909, ai .943, required .828, bullseye .807 promoted on the first-run rule; `required_embed` missed its gate (stack .707 vs .71) and was not promoted. Last rescreen: candidate 233 / review 969 / reject 81,245. All earlier worktrees removed; one worktree is open for §29 (`judge2-lines`).
 
