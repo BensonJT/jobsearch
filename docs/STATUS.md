@@ -1,6 +1,18 @@
 # Session Status — Jobsearch
 
-## HANDOFF 2026-09-19 night: second judge + gold ingest MERGED to main, schema v18, 449 tests; NO LIVE LLM CALL HAS BEEN MADE
+## HANDOFF 2026-09-20 morning: second judge evaluated live four times, bar NOT met; §29 (line-level contract) specified and being built
+
+**State.** main carries the `lens-grades` + `employer-residence-note` merge (schema v19), the live-call fixes to `judge2.py` (minimal thinking, answer read from non-thought parts, JSON mode, token-aware pacing, `JOBSEARCH_DB` override so CLI tests never open the live DB), two prompt rules (tools; years in an "or" list) and SPRINT_PLAN §29. Live DB is v19 (pre-migration backup kept outside the repo). The single-lens gold sheet is ingested (36 `human_lens_grades`). First real `finder.py retrain` ran: process .931, technical .909, ai .943, required .828, bullseye .807 promoted on the first-run rule; `required_embed` missed its gate (stack .707 vs .71) and was not promoted. Last rescreen: candidate 233 / review 969 / reject 81,245. All earlier worktrees removed; one worktree is open for §29 (`judge2-lines`).
+
+**Second judge, four live evaluations (90 blind gold rows each, `gemma-4-31b-it`, 0 unparseable, ~48 min per run under the free-tier token cap).** Catch / agree against the 70% / 85% bar: 62/58 (baseline), 46/81 (+ tools rule), 54/77 (+ or-list years rule), 46/73 (+ a background-sheet clarification). Catch over all 64 human-fails rows stayed 80-84%. Across the four runs 64 rows were right every time, 12 wrong every time, 14 changed verdict, several with no relevant change (run-to-run noise). Five catch rows returned `meets` with an empty `unmet` list in all four runs, so the bar was unreachable by wording; the model also broke a rule it had been given. The judge therefore stays a visible column only. Decision (user, 9/20): stop prompt tuning, build §29: per-line verdicts with quoted background evidence, `required_fit` derived in code, line-level evaluation against the gold unmet lines, and a same-prompt repeat run to measure noise.
+
+**NEXT, in order.**
+1. Audit and merge branch `judge2-lines` (§29, schema v20): back up the live DB first, full suite on merged main.
+2. Dry run, then live rounds 5 and 6 with the IDENTICAL prompt (noise floor). Live calls stay behind `JUDGE2_LIVE_OK=1`; the user has approved live evaluation runs with the disclosed provider, models, payload fields and background file.
+3. Read the line-level misses with the user; tune the §29.2 constants, the background sheet, or the prompt, in that order of preference.
+4. Still open: `judge2 status` ignores the background flags (prints a different prompt_version); `gold_ingest._merge` lets an incoming `seen` grade land under an existing `blind` basis for `report_feedback` (fixed for F4 only); coverage logged "no calibration matches the running config" (unchecked); the weekly retrain as a scheduled step.
+
+## HANDOFF 2026-09-19 night (superseded by the entry above): second judge + gold ingest MERGED to main, schema v18, 449 tests
 
 **State.** main = the merge of `second-judge` and `gold-ingest` (both Sonnet-built in worktrees, both audited by the orchestrator; every defect found is listed in SPRINT_PLAN §25 "Orchestrator audit" and in the gold-ingest entry below). Full suite on main: 449 passed. Live DB migrated to v18 (pre-migration backup kept outside the repo). Nothing is running; no worktrees remain.
 
