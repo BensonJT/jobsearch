@@ -1,5 +1,10 @@
 # Session Status — Jobsearch
 
+## NOTE 2026-09-28: Jev tier (§33) ACCEPTED. The plan is in `docs/JEV_PLAN.md`, and nothing is built.
+- Read JEV_PLAN §8 for progress.
+- Next: the user creates a TypeSafe account and key (JEV_PLAN §2) and rules on the agent-skill option (§7 item 5); then the smoke probe runs on the user's go.
+- This is a separate track from the lens-judge training handoff below, which is unchanged.
+
 ## HANDOFF 2026-09-28 (after a /clear): lens-judge training wave 1 IMPORTED; model-graded Top Jobs tiers MERGED; next = agreement check, retrain, re-measure thresholds, wave 2
 
 **LIVE CHECKPOINT (updated after every step; a new session on any subscription resumes from here).**
