@@ -1,5 +1,16 @@
 # Session Status — Jobsearch
 
+## DEFECT 2026-09-28 (found from the vault session, NOT fixed): Workday `remoteType` "Office Worker (NOT Remote)" normalizes to `remote`
+
+**Symptom.** Two AT&T Dallas office postings (Senior Quality/M&P/Process R-122673 `54e545fcdc3a695f6703`, Principal Program Manager-M&A R-123271 `4d1ac6145e58816d8920`) reached the Top Jobs Apply list as remote. Workday's own field says `remoteType: "Office Worker (NOT Remote)"`. Both are now `mark ... pass --reason "logistics: ..."` (no grade given).
+
+**Root cause.** `backend/ats/normalize.py` `workplace_type()`: after the exact-match lookup fails, it loops `_WORKPLACE` keys as SUBSTRINGS in insertion order, and `"remote"` is checked before `"office"`, so `"office worker (not remote)"` returns `remote`. Negation is never considered.
+
+**Blast radius (live DB, 2026-09-28, Workday rows carrying `remoteType`).** `Office Worker (NOT Remote)` -> `remote`: **689 rows, 546 active, all AT&T**, so every one bypassed the commute rule. Same value -> `None`: 796 (624 active), so the value is not applied consistently either (list vs detail stage?). Also wrong or missing: `Virtual Worker` (AT&T's real remote value) -> `None` (2); Henry Schein `Field` -> `remote` (47, 36 active) and `None` (51); `Hybrid` -> `remote` (4) and `On-site` -> `remote` (1), which the lookup table cannot produce, so something else writes `workplace_type` on those rows.
+
+**Fix wanted.** (1) Check negation first (`not remote`, `non-remote`, `no remote`) and prefer onsite; add `office worker` -> onsite, `virtual worker` -> remote, `field` -> onsite (field-based work is not remote for the commute rule). (2) Longest-key-first substring matching, never dict order. (3) Find the second writer of `workplace_type` (the Hybrid/On-site -> remote rows). (4) Re-normalize `workplace_type` from `raw_json` for existing rows, then a full rescreen so the commute rule catches them. (5) Tests with the literal AT&T, GM and Henry Schein values.
+
+
 ## HANDOFF 2026-09-26 ~11:00: NTT Global Data Centers board registered + swept; Overnight FULL launched by hand (in flight, detached); nothing else running
 
 **NTT.** A Glassdoor AI suggestion (Business Analyst, GID Operational Excellence, JR102006, remote US, $118.3K-$169K) was not in the corpus: the employer was never registered. Added `NTT Global Data Centers Americas,workday,nttglobaldatacenters,wd501,External` to the vault registry and ran `sweep_ats.py --employer "NTT Global" --detail-all --workers 1`: 224 postings, all JDs fetched, screened, coverage and required-embed run. The target posting is `0f8a36cc91447d4c00fc`: **final 95, very_strong, review**; process 0.89, technical 0.97, AI 0.12, required 0.28, level in_range, no rule reasons. Not yet LLM-judged (the FULL run's top-100 judge will pick it up if it ranks). Four more NTT rows scored strong (Sr PM Commercial & Capital Governance 80, Service Delivery PM GID OpEx 76, Sr Mgr Global HRIS 82, Investment Manager 74). The run also expired 340 USAJobs rows past their own close date: that is `close_expired_postings` on `CLOSE_BY_DATE_PLATFORMS`, by design, not a defect of the employer filter.
