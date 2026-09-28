@@ -1,5 +1,26 @@
 # Session Status — Jobsearch
 
+## HANDOFF 2026-09-28 (after a /clear): lens-judge training wave 1 IMPORTED; model-graded Top Jobs tiers MERGED; next = agreement check, retrain, re-measure thresholds, wave 2
+
+**Read this first.** User decision 2026-09-28: the hand-run lens judge (Claude Code Sonnet subagents, `finder.py judge export/import`) exists to TRAIN the TF-IDF lens models; it is NOT a gate on the report. User rule: a high-scoring posting stays on Top Jobs / Jobs Found until built, passed, tracked or closed; being shown never removes it.
+
+**Merged and pushed today (628 tests pass):**
+- `ebbcbc3` Jobs_Found no longer hides blocks surfaced in the last 14 days; `vw_shortlist` treats a hold as undecided.
+- `879a970` Top Jobs: unjudged postings get Apply / Review from the models (`report.model_rows`), marked `model` with probabilities; thresholds `MODEL_LENS_MIN` (process 0.70 / technical 0.80 / ai 0.70), `MODEL_REQ_APPLY` 0.60, `MODEL_REQ_REVIEW` 0.40, measured IN-SAMPLE against 2,590 judged rows (model Apply agreed with judge Apply 86%, 97% apply-or-review; below required 0.40 the model is unreliable, judge put 224/402 in review). Everything else unjudged and strong sits under "Requirement unclear" (`report.unclear_rows`), never hidden. Non-US primary locations are left out of model/unclear rows and counted (`judge.non_us_primary`). Live preview before wave 1: 31 model apply, 23 model review, 107 unclear.
+- `4aab90f` ADP adapter fix (1-based `$skip`, dedupe by itemID, Truncated on a short read). The adapter itself (`21bf8e9`) was merged + pushed 9/26 by an unaudited worker; audited 9/28, only defect was the paging. No ADP employer registered yet (Agile5: cid 18bcd225-9065-4e78-8585-763a250b6ab5, ccId 19000101_000001 -- Jeff has not asked to register it).
+
+**Lens-judge wave 1 DONE and IMPORTED.** `finder.py judge export --dir db/batches_20260928 --batch-size 25 --limit 300` with `--exclude-dir` for every `db/batches*` dir: 292 postings in 12 batches (153 high-band available, mixed with low / reject pools per WAVE for training balance; 95 non-US skipped). Six Sonnet subagents, two batches each, ~175-205K tokens and ~9-13 min per agent. `judge import --dir db/batches_20260928 --scorer claude-sonnet-batch`: 298 labels written (6 near-duplicate copies), 0 rejected. Of the 159 unjudged strong postings, 122 were in the queue.
+
+**NEXT, in order.**
+1. `finder.py judge report --csv db/snapshots/llm_labels.csv` (agreement vs the user's own tracker/build/pass behaviour) and skim wave 1's grades.
+2. `finder.py retrain` (gated + ledgered: promotes and rescreens only if a model passes). The lens models were last trained 9/21; wave 1 adds ~298 labels.
+3. Re-measure the model-tier thresholds against the judged rows (the measurement script is in the 9/28 session: precision/recall per lens at 0.5-0.9, required at 0.3-0.8, and the model-apply/review bands vs `vw_selection.tier`). Adjust the constants in `report.py` only if agreement moved; they are in-sample numbers.
+4. Wave 2: same export command into `db/batches_<date>` with `--exclude-dir` for EVERY `db/batches*` dir (including batches_20260928), then one Sonnet subagent per 2 batches, 6 in parallel. Grader prompt that worked: read `batch_NNN.md` in full and follow its instructions exactly; grade every posting on all three lenses with posting_id as given; write a bare JSON array to `batch_NNN.result.json`; verify with `python3 -c "import json;print(len(json.load(open(...))))"` that the count matches the .md; write ONLY the result files, no DB, no git; reply with counts and the grade_process tally. Then `judge import`.
+5. `finder.py top` and read the new Top_Jobs file with the user.
+
+**Open, flagged not fixed:** the screen lets "Remote in Canada" through (Stripe gh_jid 8055930); `non_us_primary` guards the report, the screen rule itself is unchanged. `judge2` (Gemma) gold eval re-scores cached answers unless the prompt or background sheet changed: the FULL + GOLD SCORE preset adds nothing on an unchanged prompt.
+
+
 ## DEFECT 2026-09-28 (found from the vault session, NOT fixed): Workday `remoteType` "Office Worker (NOT Remote)" normalizes to `remote`
 
 **Symptom.** Two AT&T Dallas office postings (Senior Quality/M&P/Process R-122673 `54e545fcdc3a695f6703`, Principal Program Manager-M&A R-123271 `4d1ac6145e58816d8920`) reached the Top Jobs Apply list as remote. Workday's own field says `remoteType: "Office Worker (NOT Remote)"`. Both are now `mark ... pass --reason "logistics: ..."` (no grade given).
