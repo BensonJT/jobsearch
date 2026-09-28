@@ -2,6 +2,13 @@
 
 ## HANDOFF 2026-09-28 (after a /clear): lens-judge training wave 1 IMPORTED; model-graded Top Jobs tiers MERGED; next = agreement check, retrain, re-measure thresholds, wave 2
 
+**LIVE CHECKPOINT (updated after every step; a new session on any subscription resumes from here).**
+- Step 1 agreement check: DONE 9/28. Wave 1 tally (292): process wrong 91 / bullseye 72 / adjacent 71 / stretch 58; 36 bullseye overall. Blockers (TS/SCI poly, PMP, SAFe RTE) sit in `blocker`, function grades stay on function, as designed. No action needed.
+- Step 2 retrain: STARTED 9/28 ~14:05, log `logs/retrain_20260928.log`. If the session died mid-run: check `finder.py retrain --history`; if no 9/28 ledger row, just rerun `finder.py retrain` (gated + ledgered, safe to repeat).
+- Step 3 thresholds: not started.
+- Step 4 wave 2: not started. **Resume rule:** graders write one `batch_NNN.result.json` per batch, so a lost agent loses only its unfinished batch. To resume, list `batch_*.md` in the wave dir that have no `.result.json` (or a count mismatch) and hand only those to new graders; never re-export (that makes a new queue). Import only after every batch has a result.
+- Step 5 top: not started.
+
 **Read this first.** User decision 2026-09-28: the hand-run lens judge (Claude Code Sonnet subagents, `finder.py judge export/import`) exists to TRAIN the TF-IDF lens models; it is NOT a gate on the report. User rule: a high-scoring posting stays on Top Jobs / Jobs Found until built, passed, tracked or closed; being shown never removes it.
 
 **Merged and pushed today (628 tests pass):**
