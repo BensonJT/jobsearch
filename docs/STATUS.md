@@ -1,5 +1,28 @@
 # Session Status — Jobsearch
 
+## MORNING PICKUP 2026-09-29: read the gold redo that the user launched the night of 9/28 with `bash scripts/gold_redo.sh --detach`
+
+1. **Find the run:** `ls -dt logs/gold_redo_* | head -1`. Read `SUMMARY.log` first: every step's rc and minutes. If a step failed, read that step's own log.
+   - If the run is still going, check `pgrep -af gold_redo`. The DB is locked until it finishes, so do not open it.
+2. **Gemma.**
+   - Read `gemma_eval.log`: the bar is catch ≥ 0.70 and agree ≥ 0.85 at `36ca03157cf2:gold0928`.
+   - Read `gemma_compare.log`: the old splitter (`36ca03157cf2`) against the new one (`:gold0928`). Did fixing the headings move catch or agree? The expectation was about 3-4 points; the 14 no-Required gold rows had been at 57%.
+3. **Jev** (`jev_eval.log`, prompt_version `307747dd4292`):
+   - **Required:** catch/agree against the same bar.
+   - **Lens:** blind exact ≥ 0.70, and Jev AUC ≥ TF-IDF AUC. The TF-IDF side is probably in-sample, so that comparison is conservative against Jev.
+   - **Repeatability:** flip rate ≤ 2% and median delta ≤ 0.03. The smoke probe showed about ±0.03, so this bar is tight.
+   - **Calibration:** ECE ≤ 0.10, needing n ≥ 30 blind lens grades.
+   - **Injection:** the canary catches at least 4 of 5.
+   - **Sentinel:** read it, and note it is only a same-night repeat.
+   - **Compare vs Gemma:** per-row agreement.
+   - Also check `jev_status.log`: tokens spent, drift = 0, canary flags.
+4. **Decide with the user:**
+   - Jev's bar passed or not, and why.
+   - Gemma's future: retire it, or give it the narrow escalation job (read only the lines Jev is unsure about, and quote and cite each one).
+   - Stage 2 (Jev moving the rank) only if the bar passes. It would be a separate build.
+   - Splitter Layer 2 (Jev classifying headings) only if the remaining no-Required rate still matters.
+5. After that, the lens-judge training handoff further down (wave 3, retrain) is still pending and unchanged.
+
 ## HANDOFF 2026-09-28 late: splitter Layer 1 MERGED (`27f1d98`, SPLITTER_VERSION 2026-09-28.1). NEXT = the gold reassessment of Gemma AND Jev on the new splitter
 
 **Why.** On gold, judge2 agreed with the user on 57% of postings where the splitter found no Required section, against 77% where it found one. The splitter fix is:
