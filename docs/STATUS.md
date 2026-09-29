@@ -1,6 +1,21 @@
 # Session Status — Jobsearch
 
-## PICKUP: read the full gold scoring pass started 2026-09-29 11:59 ET (logs/goldpass_20260929/)
+## RESULT 2026-09-29 afternoon: full gold pass read (logs/goldpass_20260929/)
+
+| | catch (bar 0.70) | agree (bar 0.85) | vs gold overall | line-level |
+|---|---|---|---|---|
+| Jev 9/28 (307747dd4292) | 0.63 | 0.48 | 60% | -- |
+| **Jev 9/29 (4a6d867f3a83)** | **0.89 PASS** (16/18; all fails 77/80) | **0.52** (15/29) | 77% | -- |
+| Gemma 9/28 (36ca03157cf2:gold0928) | 0.53 | 0.74 | 62% | 42/85 |
+| **Gemma 9/29 (71de026dfe93:gold0929)** | **0.72 PASS** (13/18) | **0.72** (21/29) | 68% | 52/85 |
+
+- Injection canary: 5/5 flagged (PASS, first run). Lens + calibration: still n=3 blind lens grades (needs >= 5 / >= 30). Repeatability not re-run (by design; only once accuracy passes).
+- **Both judges now pass catch; both fail agree.** The 9/29 estimate for Gemma agree (0.83) was too high: the stricter rules cost it meets rows.
+- **Jev agree misses (14):** 6 decided by the role-shape step, 3 "hard gate unclear" on generative-AI knowledge lines the fact sheet covers (retrieval), 3 soft-unmet, 2 hard-gate unmet. Shape step on Jev is a coin flip: on the rows it overrode, it correctly failed 5 gold-fails and wrongly downgraded 6 gold-meets (lines_fit alone said meets). NEXT: a better shape rule (not removal) and the "working knowledge of generative AI" retrieval miss; both are free to test with `jev rederive` / derivation replays.
+- **Gemma agree misses (8):** T. Rowe Price x2 (AI), CVS BI Engineer, CACI Process Specialist, Guidehouse Org Design, Booz Allen Digital Transformation, McKesson BI & Automation, Microsoft Datacenter planning -- all `partial`.
+- **Gold after the pass:** the user's 9/28-batch feedback sheet was ingested (10 rows; BDO 864fd10f skipped as a repost of 717315c8, same hash; Amgen + Autodesk stay 'seen'). Blind gold = 85 fails / 32 meets / 29 blank. The 8 new blind rows have no Jev/Gemma review at the current prompt versions yet.
+
+## PICKUP (done, see RESULT above): read the full gold scoring pass started 2026-09-29 11:59 ET (logs/goldpass_20260929/)
 
 - **What ran:** one Jev pass on all blind gold (prompt_version 4a6d867f3a83, today's rules and fact sheet) + the Jev injection check (first time it ran), then Gemma on all gold (`71de026dfe93:gold0929`), then `judge2 eval`, `judge2 eval --compare 36ca03157cf2:gold0928 71de026dfe93:gold0929`, `jev eval --judge2-pv 71de026dfe93:gold0929`, `jev status`. No r2/r3 repeats on purpose: repeatability is only worth paying for once the accuracy bar passes. Planned ~3.0M Jev tokens for the 86 not already answered (~$0.13) + injection; cap 16M set on the command only (the UTC day already held 11.5M).
 - **Read:** `SUMMARY.log` (each step's rc and last line), then `gemma_eval.log`, `jev_eval.log`, `gemma_compare.log`. The DB is locked while it runs (~12:00 to ~16:00 ET).
