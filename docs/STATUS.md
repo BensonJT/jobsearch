@@ -1,5 +1,45 @@
 # Session Status — Jobsearch
 
+## HANDOFF 2026-09-28 late: splitter Layer 1 MERGED (`27f1d98`, SPLITTER_VERSION 2026-09-28.1). NEXT = the gold reassessment of Gemma AND Jev on the new splitter
+
+**Why.** On gold, judge2 agreed with the user on 57% of postings where the splitter found no Required section, against 77% where it found one. The splitter fix is:
+- known headings now survive the verb filter ("What You'll Do", "Who You Are", "What You'll Bring");
+- "About You" is no longer dropped as company text;
+- headings mined from the active corpus were added;
+- physical demands, work environment and benefit-question sections are now dropped;
+- in a posting with no Required section, years and degree lines move to required.
+
+`rules.py` screening is unchanged.
+
+**Postings with no Required section found:**
+
+| Population | Before | After |
+|---|---|---|
+| Active | 21.4% | 11.1% |
+| Jev pool | 18.2% | 3.5% |
+| Gold | 12.6% | 0.9% |
+
+Gold postings with no lines at all went from 5 to 0. A random sample of newly-required lines is about 85% genuine qualifications. Suite: 757 passed + 1 known.
+
+**Side effects:**
+- Coverage and `required_embed` caches re-key, so the next pipeline run recomputes them. It is slower once and costs nothing.
+- Labels are unaffected: views never filter by rubric_version. But `judge export --relabel` will now treat every existing label as older than the current rubric.
+- Jev prompt_version is now `307747dd4292`. The dry run shows 111 postings and about 2.56M tokens.
+
+**Gold reassessment runbook (the user's go at each live step):**
+1. **Gemma.** judge2's prompt_version does not include the splitter, so a plain `judge2 run --eval-set` would serve cached answers. Re-ask under a tag and keep the old rows for the before/after:
+   ```
+   JUDGE2_LIVE_OK=1 .venv/bin/python finder.py judge2 run --eval-set --rerun --run-tag split0928 --background file --background-file judge2_background.local.md
+   .venv/bin/python finder.py judge2 eval --prompt-version <current judge2 pv, see `finder.py judge2 status`>:split0928 --background file --background-file judge2_background.local.md
+   .venv/bin/python finder.py judge2 eval --compare <current judge2 pv, see `finder.py judge2 status`> <current judge2 pv, see `finder.py judge2 status`>:split0928
+   ```
+   The run takes about 3.5 h on the free tier.
+2. **Jev.**
+   - Run `finder.py jev sentinel --init` once.
+   - Set `JEV_DAILY_TOKEN_CAP=10000000` in `.env`: three gold passes plus the injection set is about 7.7M tokens (about $0.32).
+   - Then run launch.sh preset 7 "Jev gold score (MSA)". Or by hand: `jev run --eval-set --i-have-approval`, then `--run-tag r2` and `--run-tag r3`, then `--injection`, then `jev eval --judge2-pv <current judge2 pv, see `finder.py judge2 status`>:split0928`.
+3. The two runs can overlap in wall time only if they run in separate processes. Each holds the DuckDB lock, so run them one after the other.
+
 ## HANDOFF 2026-09-28 evening: Jev tier (§33) BUILT and MERGED to main (`6670b28`), schema v23; nothing run live beyond the smoke probe
 
 - **Built:**
