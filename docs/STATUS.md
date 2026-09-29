@@ -30,14 +30,14 @@ Gold postings with no lines at all went from 5 to 0. A random sample of newly-re
 1. **Gemma.** judge2's prompt_version does not include the splitter, so a plain `judge2 run --eval-set` would serve cached answers. Re-ask under a tag and keep the old rows for the before/after:
    ```
    JUDGE2_LIVE_OK=1 .venv/bin/python finder.py judge2 run --eval-set --rerun --run-tag split0928 --background file --background-file judge2_background.local.md
-   .venv/bin/python finder.py judge2 eval --prompt-version <current judge2 pv, see `finder.py judge2 status`>:split0928 --background file --background-file judge2_background.local.md
-   .venv/bin/python finder.py judge2 eval --compare <current judge2 pv, see `finder.py judge2 status`> <current judge2 pv, see `finder.py judge2 status`>:split0928
+   .venv/bin/python finder.py judge2 eval --prompt-version 36ca03157cf2:split0928 --background file --background-file judge2_background.local.md
+   .venv/bin/python finder.py judge2 eval --compare 36ca03157cf2 36ca03157cf2:split0928
    ```
    The run takes about 3.5 h on the free tier.
 2. **Jev.**
    - Run `finder.py jev sentinel --init` once.
    - Set `JEV_DAILY_TOKEN_CAP=10000000` in `.env`: three gold passes plus the injection set is about 7.7M tokens (about $0.32).
-   - Then run launch.sh preset 7 "Jev gold score (MSA)". Or by hand: `jev run --eval-set --i-have-approval`, then `--run-tag r2` and `--run-tag r3`, then `--injection`, then `jev eval --judge2-pv <current judge2 pv, see `finder.py judge2 status`>:split0928`.
+   - Then run launch.sh preset 7 "Jev gold score (MSA)". Or by hand: `jev run --eval-set --i-have-approval`, then `--run-tag r2` and `--run-tag r3`, then `--injection`, then `jev eval --judge2-pv 36ca03157cf2:split0928`.
 3. The two runs can overlap in wall time only if they run in separate processes. Each holds the DuckDB lock, so run them one after the other.
 
 ## HANDOFF 2026-09-28 evening: Jev tier (§33) BUILT and MERGED to main (`6670b28`), schema v23; nothing run live beyond the smoke probe
