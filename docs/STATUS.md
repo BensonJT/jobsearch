@@ -1,5 +1,19 @@
 # Session Status — Jobsearch
 
+## RESULT 2026-09-29: gold redo read. Jev NOT PASSED, Gemma NOT PASSED; the Jev spend planner is recalibrated; the disagreements trace mostly to line extraction, not to judgment
+
+- **Run** `logs/gold_redo_20260928_2132`: every step rc=0, but the Jev daily cap (10M) stopped r3 at 101/111, and injection + sentinel sent nothing. The run date counts in UTC, so the 9/28 21:32 ET run is billed to 9/29 UTC. Actual spend 9,991,120 input tokens = $0.42 (the provider dashboard matches the DB to the token; output tokens, 4.76M, are free).
+- **Jev (307747dd4292):** required catch 0.63 / agree 0.48 (bar 0.70 / 0.85). Lens n=3 blind grades (min 5): not measurable. Repeatability flip 2.47% (bar 2%), median delta 0.00. Line calibration is overconfident (the 0.8-1.0 bin: forecast 0.92, observed 0.20). vs gold 67/111; Gemma vs gold 69/111.
+- **Gemma (36ca03157cf2:gold0928):** catch 0.53 / agree 0.74. The splitter Layer 1 change moved only 3 of 111 verdicts (one of them wrong-way: Guidehouse Org Design meets -> fails).
+- **Spend planner fixed:** `jev.plan_tokens` (Q.PLAN_CHARS_PER_TOKEN = 2.8, fitted on the 9/28 pass: 2.98 chars/token pooled, 2.81-3.73 per posting) drives the dry-run total and the in-run daily cap check. The dry run now prints the cost and "used today + this run vs cap -> fits / WOULD STOP". A gold pass is planned at 3.65M against 3.43M actual (+6%, the old estimate was -25%). Chunking still uses `estimate_tokens` (CHARS_PER_TOKEN 4), so requests and stored reviews do not change. Note: MAX_REQUEST_TOKENS_EST 48k at 4 chars/token is about 64k real tokens, the hard limit; the largest stored posting so far is 51k total across its requests.
+- **To finish the redo:** r3 remainder + injection + sentinel = about 0.6M planned (~$0.03). Either raise `JEV_DAILY_TOKEN_CAP` or wait until 00:00 UTC (20:00 ET).
+- **Disagreement read (24 postings where Jev AND Gemma both differ from gold):** most are line-extraction defects rather than hard inference:
+  1. `judge2.section_lines` strips the years phrase (requirements.strip_years), so Jev never sees "N years" at all. About 12 of the 19 gold-fails rows fail on a years-in-domain line (HR 10+, healthcare 7+, content governance 8+, global change 12+, capital planning 10+...). The regex also cuts inside words: "4 years of directly related" -> "ly related" (`direct` has no word boundary in YEARS_PHRASE).
+  2. Gate lines under unrecognized headings are not sent: BDO "License(s)/Certification(s): Active TS/SCI with Polygraph, required"; Myriad360 "Desired skills and experience:" holds the IASSC/ASQ cert and "Minimum 7 years" (sent as nothing).
+  3. Boilerplate is sent as required lines (pay ranges, EEO, company blurbs, remote-state notices), producing runs of "unclear".
+  4. Evidence citations are often unrelated to the line ("Experience with analytics" <- "Is a U.S. citizen"), so a "met" at high confidence can be empty; this fits the line calibration result.
+  5. Real inference (the part an LLM finds hard): domain qualifier across an or-list; role shape (inside a CFO org; one person doing a team's job); "directly related" judged against duties; "You Have: Public Trust" read as currently held; "preferred" never a gate (both models failed Guidehouse Org Design on an ACTIVE-preferred line).
+
 ## MORNING PICKUP 2026-09-29: read the gold redo that the user launched the night of 9/28 with `bash scripts/gold_redo.sh --detach`
 
 1. **Find the run:** `ls -dt logs/gold_redo_* | head -1`. Read `SUMMARY.log` first: every step's rc and minutes. If a step failed, read that step's own log.
