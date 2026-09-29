@@ -1,5 +1,12 @@
 # Session Status — Jobsearch
 
+## RESULT 2026-09-29 evening: lens ground truth derived from the user's overall grades
+
+- **Ingest:** F4 lens sheets now take human_grade_process / _technical / _ai (`7a55128`). The training views (vw_label_set_process/technical/ai) and `jev eval` already read `human_lens_grades` for all three lenses, so no other change was needed.
+- **Sheet:** vault `Tools/Lens_Derivation_Sheet_20260929.csv`, 146 blind rows, lens chosen from stored TF-IDF fits (latest `screens` row, so closed postings count too): a clear primary lens = top fit >= 0.5 and >= 0.2 ahead of the next. Rule A (overall grade -> that lens) kept: **30 rows (21 process, 9 technical)**. Blended (50) and unclear (10) excluded per the user's rule; two more excluded on a title spot check.
+- **Rule B withdrawn (wrong -> all lenses wrong):** 52 of the 54 blind `wrong` overall grades cite a requirement or domain gap (required fit), 2 cite level/logistics; none say the work differs. Loaded then deleted (162 rows); Jev had rated the process lens high on 42 of them, correctly.
+- **Lens check on what remains (n=23 with a Jev review):** process AUC Jev 0.83 vs TF-IDF 0.53 (n=16, within-one 0.88); technical n=4 and ai n=3, too small. Lens bar and calibration still not measurable. Cheapest next: Jev on the 33 AI-lens-graded postings not in the eval set (~1.1M tokens, ~$0.05) -> ai lens n=36. Note the TF-IDF AUC on derived rows is biased toward TF-IDF (it chose the lens).
+
 ## RESULT 2026-09-29 afternoon: full gold pass read (logs/goldpass_20260929/)
 
 | | catch (bar 0.70) | agree (bar 0.85) | vs gold overall | line-level |
