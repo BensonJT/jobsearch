@@ -1,9 +1,29 @@
 # Session Status — Jobsearch
 
-## NOTE 2026-09-28: Jev tier (§33) ACCEPTED. The plan is in `docs/JEV_PLAN.md`, and nothing is built.
-- Read JEV_PLAN §8 for progress.
-- Next: the user creates a TypeSafe account and key (JEV_PLAN §2) and rules on the agent-skill option (§7 item 5); then the smoke probe runs on the user's go.
-- This is a separate track from the lens-judge training handoff below, which is unchanged.
+## HANDOFF 2026-09-28 evening: Jev tier (§33) BUILT and MERGED to main (`6670b28`), schema v23; nothing run live beyond the smoke probe
+
+- **Built:**
+  - `jev.py` (client), `jev_eval.py` (MSA study), `jev_cli.py` (`finder.py jev run|eval|status|rederive|sentinel`);
+  - schema v23 (`jev_reviews`, `jev_lines`, `jev_evals`, `vw_jev_latest`, `vw_jev_eval_latest`, `vw_jev_bar`);
+  - a reported-only J3 column in Lens_Lists and Top_Jobs;
+  - `pipeline.jev_stage`, OFF by default;
+  - a `launch.sh` preset "Jev gold score (MSA)" (7).
+- **Design:** the plan and progress checklist are `docs/JEV_PLAN.md`. Its §8 is the checklist.
+- **Rank is unchanged:** a test proves it. Jev moves nothing until the user rules on stage 2.
+- **Tests:** 125 new; full suite 753 passed + 1 known (`rubric_local`, which passes on main).
+- **DB:** backup at `/mnt/e/backups/jobsearch/jobsearch_pre_v23_20260928.duckdb`. The live DB is migrated to v23 with 87,543 `vw_lens_fit` rows (unchanged).
+- **Dry run of the gold set:** 111 postings, about 2.38M tokens (about $0.10), prompt_version `5d412c2c3445`.
+- **NEXT (the user's go at each step), per JEV_PLAN §8 "Live, NEXT":**
+  - review `jev_questions.py`;
+  - re-read the fact sheet;
+  - read the `--show 1` payload;
+  - `jev sentinel --init`;
+  - the gold run. For the full preset, raise `JEV_DAILY_TOKEN_CAP` to 10M first; the preset is about 7.2M tokens.
+- **Open notes:**
+  - The TF-IDF AUC in the lens comparison is probably in-sample, which makes it conservative against Jev.
+  - `jev_stage` in overnight presets also needs `JEV_LIVE_OK` exported when the user enables it later.
+  - The `jev-wp1` through `jev-wp4` and `jev-tier` branches can be deleted after the push.
+- **Separate track:** the lens-judge training handoff below is unchanged by this work.
 
 ## HANDOFF 2026-09-28 (after a /clear): lens-judge training wave 1 IMPORTED; model-graded Top Jobs tiers MERGED; next = agreement check, retrain, re-measure thresholds, wave 2
 
