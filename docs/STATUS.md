@@ -1,5 +1,19 @@
 # Session Status — Jobsearch
 
+## START HERE (next session, written 2026-09-29 night)
+
+Read "RESULT 2026-09-29 night" below first. Where things stand: Jev catch 0.85 (PASS) / agree 0.79 (bar 0.85, 2 postings short), stored version 4a6d867f3a83 re-derived with today's code; Gemma 0.72 / 0.72. Current Jev prompt_version is b6edc888af88, so the next full pass re-asks everything (~$0.17, run after 20:00 ET when the UTC day resets; the default cap is 5M, set JEV_DAILY_TOKEN_CAP on the command).
+
+Open, in order:
+1. **Ask the user:** is Guidehouse "Senior Organizational Design Consultant" (gold = meets) People/OD domain like AHEAD AI Adoption Lead (re-ruled fails 9/29)? If yes, re-rule it (Blind_Review_Sheet / DB, same way as AHEAD) -> Jev agree 0.82.
+2. **Grafana holdout re-ask** (1 posting, ~$0.002) to confirm the "Great Fit" heading + noise fix: `jev run --eval-set --posting df2b050e5ef58ba50381`.
+3. **Remaining Jev agree misses (free analysis first):** AHEAD AI Principal Consultant + Capital One Sr Business Manager (shape split), Amgen x2 (model misreadings), McKesson BI & Automation (2 hard gates adjacent).
+4. Lens: fair out-of-fold TF-IDF comparison (code, free); lens bar not a blocker until agree passes.
+5. Then the full gold pass at the new version, then repeatability (r2/r3) only if accuracy passes.
+
+Job-search side (vault): 9/28 batch -- applied Elevance, Microsoft, Amgen; skipped GDIT, Grafana; Stripe S&O BP marked apply (package final, unsent); Centene and Stripe Total Rewards marked skip in the feedback sheet but NOT yet recorded as skips in Application_Tracker.
+
+
 ## RESULT 2026-09-29 night: free scoring fixes lift Jev agree 0.52 -> 0.79 (catch 0.85); 2 postings short of the bar
 
 - **Code (`d3393d8`, `2d8d355`), all derivation-side, applied to stored answers with `jev rederive` / `judge2 rederive` (no API):** kind guards (a `clearance` gate needs clearance vocabulary, a `licence` gate needs a credential; a required line with a years count is a years line whatever the model typed); judge noise also filtered at derive time; a years line whose firm qualifier names a never-worked domain (profile_local NEVER_BRIDGE_DOMAIN_TERMS) is unmet whatever the model said (user's domain-as-function rule); SHAPE_ADJACENT_WEIGHT 0.5 -> 0.75; "What Makes You a Great Fit" opens Required (SPLITTER_VERSION 2026-09-29.3); "incentive compensation" narrowed to "...programs" in JUDGE_NOISE (it was deleting real requirement lines). New `jev eval --prompt-version` to score a stored version.
