@@ -5,7 +5,7 @@
 Read "RESULT 2026-09-29 night" below first. Where things stand: Jev catch 0.86 (PASS) / agree 0.82 (bar 0.85, 1 posting short), stored version 4a6d867f3a83 re-derived with today's code; Gemma catch 0.68 / agree 0.71. Current Jev prompt_version is b6edc888af88, so the next full pass re-asks everything (~$0.17, run after 20:00 ET when the UTC day resets; the default cap is 5M, set JEV_DAILY_TOKEN_CAP on the command).
 
 Open, in order:
-1. **DONE 9/29:** Guidehouse "Senior Organizational Design Consultant" re-ruled meets -> fails (People/OD domain; vault Blind_Required_Calls_20260919.csv + DB; before-values logs/gold_rulings_20260929_guidehouse_before.json). Now Jev catch 0.86 / **agree 0.82 (24/29... 1 posting short)**; Gemma catch 0.68 (just under 0.70: the row joined its catch set as a miss) / agree 0.71. Gold = 86 fails / 31 meets.
+1. **DONE 9/29:** Guidehouse "Senior Organizational Design Consultant" re-ruled meets -> fails (People/OD domain; vault Blind_Required_Calls_20260919.csv + DB; before-values logs/gold_rulings_20260929_guidehouse_before.json). Now Jev catch 0.86 / **agree 0.82 (23/28; 24/28 = 0.857 passes, so 1 posting short)**, catch 18/21; Gemma catch 0.68 (just under 0.70: the row joined its catch set as a miss) / agree 0.71. Gold = 86 fails / 31 meets.
 2. **Grafana holdout re-ask** (1 posting, ~$0.002) to confirm the "Great Fit" heading + noise fix: `jev run --eval-set --posting df2b050e5ef58ba50381`.
 3. **Remaining Jev agree misses (free analysis first):** AHEAD AI Principal Consultant + Capital One Sr Business Manager (shape split), Amgen x2 (model misreadings), McKesson BI & Automation (2 hard gates adjacent).
 4. Lens: fair out-of-fold TF-IDF comparison (code, free); lens bar not a blocker until agree passes.
