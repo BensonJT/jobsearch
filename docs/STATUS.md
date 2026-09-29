@@ -1,5 +1,12 @@
 # Session Status — Jobsearch
 
+## PICKUP 2026-09-30: read the full gold scoring pass scheduled for 2026-09-29 20:05 ET (logs/goldpass_20260929/)
+
+- **What ran:** one Jev pass on all blind gold (prompt_version 4a6d867f3a83, today's rules and fact sheet) + the Jev injection check (first time it ran), then Gemma on all gold (`71de026dfe93:gold0929`), then `judge2 eval`, `judge2 eval --compare 36ca03157cf2:gold0928 71de026dfe93:gold0929`, `jev eval --judge2-pv 71de026dfe93:gold0929`, `jev status`. No r2/r3 repeats on purpose: repeatability is only worth paying for once the accuracy bar passes. Planned cost ~3.8M Jev tokens (~$0.16); cap 6M set on the command only.
+- **Read:** `SUMMARY.log` (each step's rc and last line), then `gemma_eval.log`, `jev_eval.log`, `gemma_compare.log`. The DB is locked while it runs (~20:05 to ~midnight ET).
+- **Expectation (estimated 9/29 from 23 re-run rows + 86 old rows, gold as of 9/29):** Gemma agree ~0.83 (bar 0.85), catch on the hard set ~0.63; Jev catch strong (~0.84 hard set) but agree ~0.52. Jev's meets-row harshness (missing facts the sheet has, adjacent-heavy shape) is the next work item.
+- **Gold changed 9/29:** Stripe DPM and CACI HCM BI cleared; Booz Allen ICAM unmet narrowed; AHEAD AI Adoption Lead meets -> fails (People/OD domain). Gold = 80 fails / 29 meets / 29 blank. Before-values in `logs/gold_rulings_20260929*_before.json`.
+
 ## BUILD 2026-09-29 (round 2): SPLITTER_VERSION 2026-09-29.2, judge rules for domain-as-function, never-bridge, fact sheet; NEXT = re-run the 23 again
 
 - **23-posting re-run #1 result (Jev 33175036b41e, Gemma 36ca03157cf2:x0929):** exact agreement with gold 0 -> 9 (Jev), 0 -> 5 (Gemma); gold-fails caught (fails or partial) Jev 11 -> 15 of 18, Gemma 3 -> 6; gold-meets agreed Jev 0/5, Gemma 2/5. Jev's remaining errors: evidence retrieval misses facts that exist, "or equivalent experience" degree lines failed, logistics lines rated as requirements, a bare "Clearance Required" label read as a gate, benefit/marketing lines still sent. Gemma's: the §30.3 bridge (7 of its 10 bridges on full gold were gold-fails, all naming a domain the user never worked in).
