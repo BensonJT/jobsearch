@@ -1,18 +1,25 @@
 # Session Status — Jobsearch
 
-## START HERE (next session, written 2026-09-29 night)
+## START HERE (next session, written 2026-09-29 late night)
 
-Read "RESULT 2026-09-29 night" below first. Where things stand: Jev catch 0.86 (PASS) / agree 0.82 (bar 0.85, 1 posting short), stored version 4a6d867f3a83 re-derived with today's code; Gemma catch 0.68 / agree 0.71. Current Jev prompt_version is b6edc888af88, so the next full pass re-asks everything (~$0.17, run after 20:00 ET when the UTC day resets; the default cap is 5M, set JEV_DAILY_TOKEN_CAP on the command).
+Read "RESULT 2026-09-29 late night" below first. Where things stand: Jev catch 0.86 (PASS) / agree 0.82 (bar 0.85, 1 posting short) on stored version 4a6d867f3a83, re-derived with today's code; Gemma catch 0.68 / agree 0.71. **The line questions were rewritten to quote each line's text (off-by-one fix); the new Jev prompt_version is d1dd12027da3, and a gold pass is ~4.51M tokens (~$0.19). It fits under the default 5M cap only on a fresh UTC day (after 20:00 ET) with nothing else run that day.**
 
 Open, in order:
-1. **DONE 9/29:** Guidehouse "Senior Organizational Design Consultant" re-ruled meets -> fails (People/OD domain; vault Blind_Required_Calls_20260919.csv + DB; before-values logs/gold_rulings_20260929_guidehouse_before.json). Now Jev catch 0.86 / **agree 0.82 (23/28; 24/28 = 0.857 passes, so 1 posting short)**, catch 18/21; Gemma catch 0.68 (just under 0.70: the row joined its catch set as a miss) / agree 0.71. Gold = 86 fails / 31 meets.
-2. **Grafana holdout re-ask** (1 posting, ~$0.002) to confirm the "Great Fit" heading + noise fix: `jev run --eval-set --posting df2b050e5ef58ba50381`.
-3. **Remaining Jev agree misses (free analysis first):** AHEAD AI Principal Consultant + Capital One Sr Business Manager (shape split), Amgen x2 (model misreadings), McKesson BI & Automation (2 hard gates adjacent).
-4. Lens: fair out-of-fold TF-IDF comparison (code, free); lens bar not a blocker until agree passes.
-5. Then the full gold pass at the new version, then repeatability (r2/r3) only if accuracy passes.
+1. **NEXT (needs the user's go, ~$0.19): the full gold pass at d1dd12027da3**: `jev run --eval-set --i-have-approval`, then `jev eval`. This is the test of the off-by-one fix; it is expected to move McKesson and Amgen GenAI (both agree misses) and the two catch misses with the signature.
+2. Then re-check the signature count (RESULT below; was 26/120 postings) on the new version, and read AHEAD AI + Capital One (shape split) with the user: both are judgment, not bugs.
+3. Lens: fair out-of-fold TF-IDF comparison (code, free); lens bar not a blocker until agree passes.
+4. Repeatability (r2/r3) only if accuracy passes.
+5. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` fails on a machine whose `.env` holds TYPESAFE_API_KEY, and it makes a REAL call (~8.8K tokens, temp DB). The test must blank the key in the subprocess env / skip .env loading. Deselect it until fixed.
 
 Job-search side (vault): 9/28 batch -- applied Elevance, Microsoft, Amgen; skipped GDIT, Grafana; Stripe S&O BP marked apply (package final, unsent); Centene and Stripe Total Rewards marked skip in the feedback sheet but NOT yet recorded as skips in Application_Tracker.
 
+
+## RESULT 2026-09-29 late night: Jev misreads lines by position (off-by-one); question fix built, not yet measured
+
+- **Grafana holdout re-ask (b6edc888af88, 34K tokens):** now `fails`, matching gold, but for the wrong reason, and it exposed a systemic defect. From L04 on, each answer belongs to the NEXT line (L05 "Systems Fluency" got the "Executive communication" evidence meant for L06; L06 "Cross-Functional Communication" got L07's `unmet`). The request is aligned (ids L00..Lnn match); the questions asked about `` `lines[i].text` ``, so the model had to count through the array, and it slipped. L04 was a split fragment of L03 ("Comfort standing up lightweight tools...", no label), which is where it slipped.
+- **How widespread (stored 4a6d867f3a83, free):** a narrow detector (a degree kind or a degree fact as evidence on a non-degree line whose NEXT line is a degree line) fires on **26 of 120 gold postings**. It is a lower bound: it only sees shifts next to a degree line. It includes 2 of the 5 agree misses (**McKesson BI & Automation**: "Degree or equivalent" got the M.A., the Bachelor's line got the years answer, the 7+ years line got `skill`; **Amgen GenAI Platform Engineer**: "Experience in biotech..." got the M.A., the three "soft unmet" were shifted answers) and 2 catch misses (5bc3f3d6c980f94982bf, 7348fa7f0c0adda8338e: gold fails, Jev meets).
+- **Fix (`jev_questions.py`, QUESTION_SET_VERSION 2026-09-29.1):** every kind / verdict / evidence question now names its line by id AND quotes the text (`line_ref`). +~10% tokens. New prompt_version d1dd12027da3. Test asserts each line question quotes its own line and never says `lines[`.
+- **Derive fix (`judge2.names_never_worked_domain`, free, applied with `jev rederive`):** the never-worked-domain rule fired when ANY or-list item named such a domain, so "In data science, business analytics, process improvement, engineering, or related fields" (Amgen Process Intelligence) was a hard fail. Now a never-worked term used as a MODIFIER ("healthcare strategy, operations strategy, ...", "HR operations") still scopes the whole list (reading rule 1), but a term that is a complete list item is one alternative, and the rule stands down when the line also names a domain in the new `profile.WORKED_ALTERNATIVE_TERMS` (set in profile_local; narrow list: process improvement, business analytics, business transformation, ...). A bug found on the way: the firm text joined clauses with a space, so every term looked like a modifier; it now joins with ", ". Result on stored answers: Amgen PI fails -> partial (2 soft unmet: Celonis, and "Strong communication", which looks like another shifted answer); Healthcare "Mental Well Being" (gold fails) still fails; catch 18/21, agree 23/28 unchanged. DB backup before rederive: session scratchpad `jobsearch_pre_rederive_20260929b.duckdb`.
 
 ## RESULT 2026-09-29 night: free scoring fixes lift Jev agree 0.52 -> 0.79 (catch 0.85); 2 postings short of the bar
 
