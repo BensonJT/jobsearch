@@ -1,5 +1,13 @@
 # Session Status — Jobsearch
 
+## RESULT 2026-09-29 night: free scoring fixes lift Jev agree 0.52 -> 0.79 (catch 0.85); 2 postings short of the bar
+
+- **Code (`d3393d8`, `2d8d355`), all derivation-side, applied to stored answers with `jev rederive` / `judge2 rederive` (no API):** kind guards (a `clearance` gate needs clearance vocabulary, a `licence` gate needs a credential; a required line with a years count is a years line whatever the model typed); judge noise also filtered at derive time; a years line whose firm qualifier names a never-worked domain (profile_local NEVER_BRIDGE_DOMAIN_TERMS) is unmet whatever the model said (user's domain-as-function rule); SHAPE_ADJACENT_WEIGHT 0.5 -> 0.75; "What Makes You a Great Fit" opens Required (SPLITTER_VERSION 2026-09-29.3); "incentive compensation" narrowed to "...programs" in JUDGE_NOISE (it was deleting real requirement lines). New `jev eval --prompt-version` to score a stored version.
+- **Official, Jev 4a6d867f3a83 re-derived:** catch 0.85 (17/20, bar 0.70) PASS; agree 0.79 (23/29, bar 0.85); vs gold 80%. Gemma 71de026dfe93:gold0929 unchanged 0.72 / 0.72 (its responsibility ratings do not move with the shape weight).
+- **Holdout (8 new blind rows from the 9/28 feedback sheet, never used for tuning; Jev at ae02b4049757, $0.01):** 6/8; misses Humana (a role-shape judgment) and Grafana (qualifications were dropped by the heading gap and the noise phrase, both now fixed; needs a re-ask to confirm).
+- **Remaining Jev agree misses (6):** AHEAD AI Principal Consultant + Capital One Sr Business Manager (shape split), Amgen GenAI Platform Engineer (3 soft unmet), Amgen Process Intelligence (a years fragment "In data science, business analytics, process improvement..." rated unmet), Guidehouse Senior Organizational Design Consultant (OD years unmet; gold meets -- ask the user whether OD is People/OD domain like AHEAD AI Adoption), McKesson BI & Automation (2 hard gates adjacent).
+- **Note:** the current Jev prompt_version is now b6edc888af88 (noise + splitter changed what is sent), so the next full gold pass re-asks every posting (~4.1M tokens, ~$0.17). DB backups before ingest/rederive are in the session scratchpad.
+
 ## RESULT 2026-09-29 evening: lens ground truth derived from the user's overall grades
 
 - **Ingest:** F4 lens sheets now take human_grade_process / _technical / _ai (`7a55128`). The training views (vw_label_set_process/technical/ai) and `jev eval` already read `human_lens_grades` for all three lenses, so no other change was needed.
