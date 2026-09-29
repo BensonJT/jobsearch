@@ -26,7 +26,7 @@ Gold postings with no lines at all went from 5 to 0. A random sample of newly-re
 - Labels are unaffected: views never filter by rubric_version. But `judge export --relabel` will now treat every existing label as older than the current rubric.
 - Jev prompt_version is now `307747dd4292`. The dry run shows 111 postings and about 2.56M tokens.
 
-**Gold reassessment runbook (the user's go at each live step):**
+**Gold reassessment runbook.** The ONE command is `bash scripts/gold_redo.sh --detach`. Run `--dry-run` first to see the plan. It runs every step below in order and writes `logs/gold_redo_<stamp>/SUMMARY.log` for the morning read. It is reusable: prompt versions are computed at run time, and `--tag` sets the Gemma re-ask tag. The manual steps it wraps are:
 1. **Gemma.** judge2's prompt_version does not include the splitter, so a plain `judge2 run --eval-set` would serve cached answers. Re-ask under a tag and keep the old rows for the before/after:
    ```
    JUDGE2_LIVE_OK=1 .venv/bin/python finder.py judge2 run --eval-set --rerun --run-tag split0928 --background file --background-file judge2_background.local.md
