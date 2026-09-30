@@ -1,5 +1,18 @@
 # Session Status — Jobsearch
 
+## RESULT 2026-09-30 ~13:00 UTC: gated experiment -- Jev over this morning's 114 Apply rows: would demote 28 (25 after excluding user-adjudicated rows); report in the vault `Search_Results/Jev_Over_Apply_20260930.md`
+
+`logs/gated_20260930/run.sh` (user fired it): 114 Apply ids from `report.top_rows`; 98 inside the 0.70 gated population (16 judge-apply rows sit below every lens-model floor -- listed under "Not reviewed"), 95 reviewed fresh + 3 cached, 3.11M tokens, ~$0.13, 4 min, 0 errors. Tabulation `logs/gated_20260930/tabulate.py` (run with `PYTHONPATH=.`), rule: demote on Jev `required_fit = fails`, or Jev `wrong` on every lens the judge surfaced the row on.
+
+Jev required_fit over the 100 reviewed: meets 60 / partial 13 / fails 27. **Would demote 28 = 27 required-fails + 1 lens-wrong.** Three of the 28 are `adjudicated = TRUE` rows (CACI HCM Analytics & BI Developer, Guidehouse Senior OD Consultant, Amgen Agentic AI Business Solutions -- the user placed them in Apply; human > Jev, so a gate must skip adjudicated rows): **25 real demotions of 97.**
+
+Reading the 25 (Fable, not the user): most match the user's own standing rules -- active Secret clearance (CACI Sr BA; Oracle Principal Data Analyst clearance card), degree gates (Amgen PhD/Master's x3, Microsoft Master's AND years), "N years IN a function" (USAA Change Partner 2 yrs in change mgmt; Stripe 2 yrs inside an HR team; Guidehouse OD 4 yrs org design; CVS 8 yrs healthcare; Capital One 3 yrs people management), and shape (Oracle Site Deployment Manager x3 = data-center construction; Capital One CDX product strategy = product ops; Amgen media analytics = marketing; CACI Appian BA; Enterprise Program Manager GS liaison). Doubtful, worth the user's ruling: USAJobs Sr Operations Research Analyst (education-equivalence boilerplate read as the unmet line), Credence Sr Data & Systems Manager ("7 yrs data science / systems mgmt / IT operations" is met by the record; the 3-yr supervisory line is the real question), Guidehouse Technical PM ("8 yrs managing ... infrastructure, data ... enterprise technology initiatives" reads met), Capital One Data Governance (Jev says all hard gates met; my lens rule demoted it because Jev graded technical `wrong` while the judge surfaced it on technical -- Jev graded process adjacent, so "wrong on every surfacing lens" is too narrow; use "wrong on every lens" instead).
+
+Stage-2 shape this supports (needs the user's go): a Jev demotion pass over `top_rows(apply)` + `top_rows(review)` after the judge stage, before `write_top_jobs`; demoted rows stay visible in a "Jev demoted" section with the derive_why line; adjudicated rows exempt; Gemma second only on the demoted rows; every user overrule of a demotion becomes a gold ruling. Cost ~$0.15-0.20 per morning at today's volumes.
+
+Report oddity (not fixed): `vw_selection` rows with `adjudicated = TRUE` carry NULL lens grades and can carry `required_fit = fails` yet sit in `apply` -- correct by design (the user's ruling), but the Top Jobs table shows them as `None/None/None`.
+
+
 ## RESULT 2026-09-30 ~12:45 UTC: Jev repeatability PASSED, injection PASSED, calibration NOT PASSED; required bar re-confirmed on 115; lens bar still not passed (`logs/jevrep_20260930/`)
 
 Run by the user by hand (`logs/jevrep_20260930/chain.sh`; the auto-mode classifier refuses `--i-have-approval` with a raised `JEV_DAILY_TOKEN_CAP` from Claude, so the user fires these). r2 + r3 + injection: 115+115+5 postings, 8.34M input tokens, ~$0.35, 2.5 min per gold pass, 0 errors, 0 drift. `jev sentinel --init` was already pinned (`db/jev_sentinel_ids.txt`), left as is.
