@@ -1,5 +1,13 @@
 # Session Status — Jobsearch
 
+## RESULT 2026-09-30 ~13:50 UTC: whitelist extension APPLIED (user's go), `jev rederive` + `jev eval` re-run; required bar unchanged, Apply-list fails 27 -> 22
+
+`backend/profile_local.py` `WORKED_ALTERNATIVE_TERMS` +16 terms (program/project/portfolio management, business operations, IT operations, operations management, systems management, data analysis, data analyst, reporting, business intelligence, infrastructure, systems integration, enterprise technology, quality assurance, process management; `operations` deliberately left out). `jev rederive`: 1116 reviews recomputed from stored lines, 12 changed (all versions/tags). `jev eval` at 5f78009c5e5e: [required] PASSED, catch 20/23 = 0.870, agree 26/28 = 0.929, all human fails caught 81/87 -- identical to before; jev_vs_gold exact 100/115 (was 101: Forward Financing GPM fails -> partial, still a catch). Repeatability / injection unchanged (stored, not re-run); lens and calibration unchanged. No live call was needed: the change is downstream of the API.
+
+Apply list re-tabulated (`Search_Results/Jev_Over_Apply_20260930.md` regenerated): Jev required_fit meets 64 / partial 14 / fails 22; would demote 23 (22 fails + 1 lens rule), 3 of them user-adjudicated rows -> 20 real demotions of 97. Reverted to keep: Microsoft Sr Data Analyst, Guidehouse Technical PM, Amgen Program Manager, Amgen Sr Program Manager (meets); Stripe Product Analytics (partial).
+
+Not done: judge2 (Gemma) stored verdicts share `derive_required_fit` and were NOT re-derived; run judge2's rederive (if it has one) before the next Gemma gold comparison, or accept that its 7533bcce2a17 numbers predate the whitelist.
+
 ## FINDING 2026-09-30 ~13:30 UTC: 9 of the 27 Jev fails on the Apply list came from the never-worked-domain override, not from Jev; a whitelist extension fixes 5 with no gold cost (NOT APPLIED, user's call)
 
 Trigger: the user asked whether Jev knows about the master's degree. It does: the fact sheet's Education, Certifications and Clearance sections carry every item in the resume template's EDUCATION & CERTIFICATIONS and SECURITY ELIGIBILITY block (`Professional/Resources/Master_Template_Standardized_Final.docx`, vault, private) -- the degrees, the three certifications and the inactive-clearance note all match. Jev's own line verdicts on the degree lines were `met` (0.95-0.99) with the master's as evidence.
