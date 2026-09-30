@@ -1,18 +1,31 @@
 # Session Status — Jobsearch
 
-## START HERE (next session, written 2026-09-29 late night)
+## START HERE (next session, written 2026-09-30 00:45 UTC)
 
-Read "RESULT 2026-09-29 late night" below first. Where things stand: Jev catch 0.86 (PASS) / agree 0.82 (bar 0.85, 1 posting short) on stored version 4a6d867f3a83, re-derived with today's code; Gemma catch 0.68 / agree 0.71. **The line questions were rewritten to quote each line's text (off-by-one fix); the new Jev prompt_version is d1dd12027da3, and a gold pass is ~4.51M tokens (~$0.19). It fits under the default 5M cap only on a fresh UTC day (after 20:00 ET) with nothing else run that day.**
+Read "RESULT 2026-09-29 gold pass d1dd12027da3" below first. Where things stand: the off-by-one is fixed (shift signature 26 -> 1 of ~117). Jev at d1dd12027da3 re-derived with today's code: **catch 0.87 (20/23) PASS / agree 0.71 (22/31), bar 0.85 = 27/31, 5 postings short.** Current Jev prompt_version is **bf97b962d770** (splitter 2026-09-29.4: "Qualifications We Prefer" opens Preferred), so the next full pass re-asks everything (~4.47M tokens, ~$0.19; today's UTC cap is mostly spent).
 
 Open, in order:
-1. **NEXT (needs the user's go, ~$0.19): the full gold pass at d1dd12027da3**: `jev run --eval-set --i-have-approval`, then `jev eval`. This is the test of the off-by-one fix; it is expected to move McKesson and Amgen GenAI (both agree misses) and the two catch misses with the signature.
-2. Then re-check the signature count (RESULT below; was 26/120 postings) on the new version, and read AHEAD AI + Capital One (shape split) with the user: both are judgment, not bugs.
+1. **The user rules on the 8 remaining agree misses (judgment, not bugs; list in the RESULT below).** Several are one rule each: shape calls on AI-consulting roles with zero `met` responsibilities, the evidence-without-a-span rule, and environment qualifiers read `unclear`.
+2. **Then (user's go, ~$0.19): full gold pass at the then-current version**, `jev run --eval-set --i-have-approval`, then `jev eval`. Expected +1 from the splitter fix alone (Classified Infrastructure).
 3. Lens: fair out-of-fold TF-IDF comparison (code, free); lens bar not a blocker until agree passes.
 4. Repeatability (r2/r3) only if accuracy passes.
 5. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` fails on a machine whose `.env` holds TYPESAFE_API_KEY, and it makes a REAL call (~8.8K tokens, temp DB). The test must blank the key in the subprocess env / skip .env loading. Deselect it until fixed.
 
 Job-search side (vault): 9/28 batch -- applied Elevance, Microsoft, Amgen; skipped GDIT, Grafana; Stripe S&O BP marked apply (package final, unsent); Centene and Stripe Total Rewards marked skip in the feedback sheet but NOT yet recorded as skips in Application_Tracker.
 
+
+## RESULT 2026-09-29 gold pass d1dd12027da3 (quoted-line questions): shift gone, agree exposed
+
+- **Run:** 117/117 reviewed, 4.13M tokens (~$0.17), 0 errors; `logs/goldpass_20260929b/`. Shift signature (degree detector) **26 -> 1**. Verdict mix barely moved (required met 0.52 both; responsibility met 0.27 -> 0.28), so the fix did not make Jev harsher overall.
+- **As run:** catch 0.87 (20/23) / agree 0.65 (20/31). n_agree rose 28 -> 31 (0 unjudged, was 6). On the same 28 as before, agree fell 23 -> 18: 6 former hits were right partly by shifted luck; Capital One ORM became a hit.
+- **Free derive fixes (judge2, no prompt change; `jev rederive`):** `DERIVE_NOISE` drops lines that say something is NOT required ("FINRA licenses are not required and will not be supported" was an unclear licence gate on 2 AI postings), apply-anyway boilerplate, and the Amgen mission slogan; a `years_function` line with no years count is scored as a skill ("Experience in biotechnology, pharmaceuticals, healthcare or another regulated industry"). -> **catch 0.87 (20/23) / agree 0.71 (22/31).** DB backup before this rederive: scratchpad `jobsearch_pre_rederive_20260929c.duckdb`.
+- **Splitter fix (changes prompt_version):** RTX "Qualifications We Prefer" was read as Required ("qualifications"), so its preferred "Active and transferable ... security clearance" failed Classified Infrastructure (gold meets, correctly). 5 gold postings carry that heading.
+- **Remaining agree misses (8, all judgment):**
+  - Shape, zero `met` responsibilities: AHEAD AI Principal Consultant (wrong 0/6/6), Senior Consultant AI Strategist (split 0/4/2), Amgen GenAI Platform Engineer (split 0/6/2), Salesforce Senior Help Agent Manager (wrong 0/3/8; 5 of its "responsibilities" are about-the-role prose).
+  - Amgen Process Intelligence: 2 soft tools unmet (Celonis; Power BI/Tableau), both true facts -> partial.
+  - McKesson BI & Automation: "This role sits in Finance, not in a BI or data engineering organization" rated unmet (rule 7, in a finance org) + advanced Power BI unmet -> partial.
+  - Senior BI Engineer: "5+ years leading large-scale analytics efforts" met (0.86), but its evidence is an achievement with no span, so `_effective_verdict` makes it unclear (existing rule).
+  - Stripe S&O BP GPP: "7+ years ... significant portion ... at high-growth tech companies or consulting" rated unclear (environment qualifier; user rule says close/adjacent).
 
 ## RESULT 2026-09-29 late night: Jev misreads lines by position (off-by-one); question fix built, not yet measured
 
