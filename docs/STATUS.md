@@ -1,18 +1,26 @@
 # Session Status — Jobsearch
 
-## START HERE (next session, written 2026-09-30 ~01:30 UTC)
+## START HERE (next session, written 2026-09-30 ~02:30 UTC)
 
-Read "RESULT 2026-09-29 gold pass d1dd12027da3" and "RULINGS 2026-09-29 late" below. Where things stand: the off-by-one is fixed (shift signature 26 -> 1). Jev at d1dd12027da3 re-derived with today's code: **catch 0.88 (21/24) PASS / agree 0.77 (23/30), bar 0.85 = 26/30, 3 postings short** (AHEAD re-ruled fails on shape 9/29, logs/gold_rulings_20260929_ahead_before.json). Current Jev prompt_version is **b2f4565faec2** (splitter 2026-09-29.4, QUESTION_SET 2026-09-29.2, one fact added), ~4.50M tokens (~$0.19) for a full pass; the UTC day cap (5M) needs `JEV_DAILY_TOKEN_CAP=10000000` on the command if run before 20:00 ET 9/30.
+**Both required bars pass on the stored gold answers (d1dd12027da3 re-derived): catch 21/24 = 0.875 (bar 0.70), agree 25/29 = 0.862 (bar 0.85).** In-sample: several of tonight's derive fixes were found by reading gold misses. Confirmation needs (a) the fresh pass at the current prompt_version (the reading-rule changes and the new background facts have NOT been asked yet; only derive-side fixes are measured), and (b) the 8-row 9/28 holdout (`db/holdout_20260929.txt`, never used for tuning; 6/8 at ae02b4049757).
 
 Open, in order:
-1. **The user re-rules the 4 remaining gold rows (AHEAD done: fails, wrong shape)** on vault `Professional/Areas/Job_Search/Tools/Jev_Reruling_Sheet_20260929.md` (AHEAD AI Principal, Senior Consultant AI Strategist, Amgen GenAI Platform Engineer, Salesforce Help Agent Manager, McKesson BI & Automation). He does not remember the 9/23 `meets` rulings. A row he clears leaves the agree set; a row he flips to `fails` becomes a catch row. Apply with the gold_rulings pattern (vault CSV + DB, before-values to logs/).
-2. **Then (user's go, ~$0.19): full gold pass at b2f4565faec2**, `jev run --eval-set --i-have-approval`, then `jev eval`. Expected from the changes it carries: Classified Infrastructure (+1, splitter), Senior BI Engineer (+1, new fact), Amgen Process Intelligence (+1 if the viz-tools line reads as a category).
-3. Lens: fair out-of-fold TF-IDF comparison (code, free); lens bar not a blocker until agree passes.
-4. Repeatability (r2/r3) only if accuracy passes.
-5. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` fails on a machine whose `.env` holds TYPESAFE_API_KEY, and it makes a REAL call (~8.8K tokens, temp DB). Deselect it until fixed.
+1. **Salesforce Senior Help Agent Manager** (sheet row 4): the user leans "I didn't perform a job of that shape before ... which is true" but has not ruled. Options: fails on shape, or clear. Also a splitter question: 5 of its "responsibility" lines are intro prose about the role; the 6 real duties alone still read 0 met / 3 adjacent / 3 unmet.
+2. **Full gold pass at the current prompt_version (user's go, ~$0.19)**: `jev run --eval-set --i-have-approval` (needs `JEV_DAILY_TOKEN_CAP=10000000` before 20:00 ET 9/30), then `jev eval`. Then the holdout: `jev run --eval-set --postings-file db/holdout_20260929.txt`.
+3. If accuracy holds: repeatability r2/r3, injection set, then the user rules on stage 2 (whether Jev may move the rank).
+4. Lens: fair out-of-fold TF-IDF comparison (code, free).
+5. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` makes a REAL call when `.env` holds TYPESAFE_API_KEY. Deselect until fixed.
 
 Job-search side (vault): 9/28 batch -- applied Elevance, Microsoft, Amgen; skipped GDIT, Grafana; Stripe S&O BP marked apply (package final, unsent); Centene and Stripe Total Rewards marked skip in the feedback sheet but NOT yet recorded as skips in Application_Tracker.
 
+
+## RULINGS 2026-09-29 late, round 2 (the re-ruling sheet)
+
+- **AHEAD AI Principal Consultant: meets -> fails on ROLE SHAPE** ("Jev's rulings on the responsibilities are smart, informed, look like I could have written them"). Human grade stays stretch. Catch 20/23 -> 21/24.
+- **Senior Consultant AI Strategist: CLEARED** (agrees with Jev's partial; a stretch with no named hard gate). Rule adopted: a `stretch` row gets no binary unless a named hard gate decides it.
+- **Amgen GenAI Platform Engineer: meets stays.** "ChatGPT Enterprise, custom GPTs or comparable" is MET: custom Gemini Gems (taught colleagues at Verizon to build them), Claude Skills, a second-brain system since 2025 -> facts added to `judge2_background.local.md` (+ "native English speaker"). DERIVE_NOISE gains the Amgen slogans, "with these qualifications:" heading fragments, and "This/The role sits|is|reports..." job-description lines. Jev: partial -> meets.
+- **McKesson BI & Automation: meets stays.** User agrees with Jev's tool calls; "This role sits in Finance" describes the job -> filtered. Jev: partial -> meets.
+- Before-values: `logs/gold_rulings_20260929_ahead_before.json`, `logs/gold_rulings_20260929_aistrategist_before.json`. DB backup before the round-2 rederive: scratchpad `jobsearch_pre_rederive_20260929e.duckdb`.
 
 ## RULINGS 2026-09-29 late (the user, on the 8 judgment misses)
 
