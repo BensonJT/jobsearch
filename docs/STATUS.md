@@ -1,15 +1,18 @@
 # Session Status — Jobsearch
 
-## START HERE (next session, written 2026-09-30 ~02:30 UTC)
+## START HERE (next session, written 2026-09-30 ~03:45 UTC)
 
-**Both required bars pass on the stored gold answers (d1dd12027da3 re-derived): catch 21/24 = 0.875 (bar 0.70), agree 25/28 = 0.893 (bar 0.85).** Gold = 89 fails / 28 meets after the 9/29 re-rulings. In-sample: several of tonight's derive fixes were found by reading gold misses. Confirmation needs (a) the fresh pass at the current prompt_version (the reading-rule changes and the new background facts have NOT been asked yet; only derive-side fixes are measured), and (b) the 8-row 9/28 holdout (`db/holdout_20260929.txt`, never used for tuning; 6/8 at ae02b4049757).
+**REQUIRED BAR PASSED on a fresh gold pass at prompt_version 5f78009c5e5e** (`logs/goldpass_20260929c/`): catch 21/24 = 0.875 (bar 0.70), agree 26/28 = 0.929 (bar 0.85), 0 unjudged of 116; all human fails caught 82/88 = 0.93. Holdout (8 rows from 9/28, `db/holdout_20260929.txt`): 7/8 (miss: Humana Medicare Advantage Bid Ops, a role-shape call, same as at ae02b4049757). Lens set re-asked at this version (41 more postings, 1.48M tokens): lens bar still NOT passed (exact 0.24, ECE 0.47; process AUC Jev 0.82 vs TF-IDF 0.66; ai 0.86 vs 1.00 in-sample TF-IDF; technical n=9). Tonight's spend: ~10.1M tokens, ~$0.42.
 
 Open, in order:
-1. **DONE 9/29: Salesforce Senior Help Agent Manager re-ruled meets -> fails on role shape, aligned with Jev** (logs/gold_rulings_20260929_salesforce_before.json). The re-ruling sheet is complete. Splitter item remains: 5 of its "responsibility" lines are intro prose about the role (the 6 real duties alone still read 0 met / 3 adjacent / 3 unmet).
-2. **Full gold pass at the current prompt_version (user's go, ~$0.19)**: `jev run --eval-set --i-have-approval` (needs `JEV_DAILY_TOKEN_CAP=10000000` before 20:00 ET 9/30), then `jev eval`. Then the holdout: `jev run --eval-set --postings-file db/holdout_20260929.txt`.
-3. If accuracy holds: repeatability r2/r3, injection set, then the user rules on stage 2 (whether Jev may move the rank).
-4. Lens: fair out-of-fold TF-IDF comparison (code, free).
-5. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` makes a REAL call when `.env` holds TYPESAFE_API_KEY. Deselect until fixed.
+1. **Repeatability (user's go, ~$0.38 for two more gold passes):** `jev run --eval-set --run-tag r2 --i-have-approval`, then `--run-tag r3`, then `jev eval`. Bar: verdict/grade flip rate <= 2%, median |dp| <= 0.03. **Watch AHEAD AI Principal Consultant:** at d1dd12027da3 Jev said shape wrong (the user then re-ruled gold to fails, agreeing); at 5f78009c5e5e it bridges the years line and says meets. One flip already visible between versions; r2/r3 measure it within a version.
+2. **Injection set** (`--injection`, ~5 postings) and `jev sentinel --init` at this version.
+3. **Then the user rules on stage 2** (whether Jev may move the rank; authority order human > Jev > judge2 > judge1 > models).
+4. **Lens:** fair out-of-fold TF-IDF comparison (free code); then decide whether exact-grade 0.70 is the right bar (Jev ranks well, grades generously: 51/66 at >= 0.8 vs observed ~0.5) -- a calibration map may beat more prompt work.
+5. Splitter: intro prose lands in `responsibility` (Salesforce Help Agent Manager: 5 of 11 lines); a fix changes the prompt_version.
+6. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` makes a REAL call when `.env` holds TYPESAFE_API_KEY. Deselect until fixed.
+
+Remaining gold disagreements at 5f78009c5e5e -- agree misses (2): Amgen Process Intelligence (2 soft tools unmet: Celonis-type process mining, Power BI/Tableau -- the viz line still read as unmet despite the category rule), Microsoft Sr PM Datacenter ("Microsoft Cloud Background Check" read as an unclear hard gate: a background check is obtainable, not a clearance -- candidate for a kind guard). Catch misses among all fails (6): AHEAD (see above), Manager Executive Compensation, Principal EITP BU Client Leader, Director BI Reporting Sensing & Exec Analytics, Principal Specialist FP&A, Humana Medicare Bid Ops.
 
 Job-search side (vault): 9/28 batch -- applied Elevance, Microsoft, Amgen; skipped GDIT, Grafana; Stripe S&O BP marked apply (package final, unsent); Centene and Stripe Total Rewards marked skip in the feedback sheet but NOT yet recorded as skips in Application_Tracker.
 
