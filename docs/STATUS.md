@@ -1,5 +1,23 @@
 # Session Status — Jobsearch
 
+## RESULT 2026-09-30 ~12:45 UTC: Jev repeatability PASSED, injection PASSED, calibration NOT PASSED; required bar re-confirmed on 115; lens bar still not passed (`logs/jevrep_20260930/`)
+
+Run by the user by hand (`logs/jevrep_20260930/chain.sh`; the auto-mode classifier refuses `--i-have-approval` with a raised `JEV_DAILY_TOKEN_CAP` from Claude, so the user fires these). r2 + r3 + injection: 115+115+5 postings, 8.34M input tokens, ~$0.35, 2.5 min per gold pass, 0 errors, 0 drift. `jev sentinel --init` was already pinned (`db/jev_sentinel_ids.txt`), left as is.
+
+`jev eval` at 5f78009c5e5e:
+- **[required] PASSED (n=115):** catch 20/23 = 0.870, agree 26/28 = 0.929, all human fails caught 81/87 = 0.931, 0 unjudged. Compare: jev_vs_gold 101/115 = 0.878; judge2 (7533bcce2a17) vs gold 72/98 = 0.735; jev_vs_judge2 0.765.
+- **[repeatability] PASSED (n=230 pairs):** field flip rate 184/11628 = 0.0158 (bar 0.02), median |dp| 0.000 (bar 0.03), p95 0.04, max 0.19. **Verdict-level (what a gate would key on):** required_fit changed on 5/115 postings across the three passes, every one a single step (meets<->partial or partial<->fails, never meets<->fails): f61c99e50c574ae803b0, df2b050e5ef58ba50381, 42d1f15f538af9fca3ae (AHEAD AI Principal Consultant: meets / partial / partial -- the cross-version flip noted in START HERE is also within-version noise), 7348fa7f0c0adda8338e, ec066f5a302a3a23d366. Lens grades changed on 8/115, all single-step.
+- **[injection] PASSED:** canary caught 5/5 (injection_p 0.97-0.99 vs 0.03-0.04 original); lens/required unchanged by the injection.
+- **[lens] NOT PASSED (n=66):** blind exact 0.242 (within-one 0.652); process exact 0.381 / within-one 0.905, AUC Jev 0.817 vs TF-IDF 0.789 (n=21); technical n=9, AUC 0.50 vs 1.00; ai exact 0.194, AUC 0.862 vs 1.00 (n=36, pos 8). TF-IDF is in-sample on these rows (eval says so), so the comparison is conservative against Jev.
+- **[calibration] NOT PASSED:** lens ECE 0.472 (CI 0.38-0.56), n=66; 53 of 66 top-choice confidences sit in [0.8, 1.0] with observed 0.49 -- Jev is confidently generous. Lines ECE 0.153. This bar only gates a PROBABILITY becoming a rank input; a categorical demotion gate does not need it.
+
+**Reading.** Jev is trustworthy on the required-fit verdict and stable; it ranks lenses well but grades them generously and its confidences mean little. Use required_fit (and `wrong` on the lens that surfaced a row) as a DEMOTION signal; never promote on Jev, never use its probabilities.
+
+**User direction (this session, 2026-09-30):** put Jev near the END of the pipeline, reviewing the Jobs_Found / Top Jobs subset so the morning Apply list is narrower and truer (lens fit, requirement gates, "the domain is the job"); logistics stays with the rule engine (fix the Workday `NOT Remote` normalizer, DEFECT 9/28); Gemma second, only on Jev's demotions (corroboration where it matters; cuts Gemma from 100 rows/night to ~20-30 and the FULL preset by ~2h). Stage-2 (moving the rank) still needs the user's explicit go after the experiment below.
+
+**Experiment queued (user's go):** `logs/gated_20260930/run.sh` -- Jev reviews this morning's 114 Apply rows (`report.top_rows(con,'apply')`, narrowed through `--gated`, so rows under the 0.70 lens-model floor are dropped and counted), then `logs/gated_20260930/tabulate.py` writes "what Jev would have demoted" for the user to read. ~4M tokens, ~$0.17.
+
+
 ## HANDOFF 2026-09-30 ~12:15 UTC: lens-judge wave 3 GRADED + IMPORTED; retrain on wave 2 ran overnight; next = retrain on wave 3 (tonight's preset), then wave 4
 
 **Overnight runs (both status 0).** `retrain|sweep --llm-top 100|top|maint` 00:02-06:01 EDT: retrain 76 min, first to include wave 2 -- process/technical/ai/required PROMOTED (grouped AUC 0.924/0.895/0.921/0.846; the three lens models each dipped <0.012 but stayed inside the tolerance, required rose +0.025), bullseye kept previous (0.768 < 0.807-0.02), required_embed promoted (stack 0.757); full rescreen 87,543. Sweep 147/147 boards, 8135 new / 8392 taken down, 5432 JDs; Judge2 100 reviewed in 3h45m (same rate as 9/24). DB compacted 2.4 -> 1.4 GB. Then `sweep|top|maint` 07:16-07:37: 326 new, 3 review, Judge2 0 (nothing crossed). Jev was NOT in either preset (reported-only, own preset); `jev_lines` unchanged at 16,780. The `model 28c3b6102998` tag on the Screen line is the 9/19 *overall* tfidf_lr model, which `retrain` never touches -- expected, not a defect.
