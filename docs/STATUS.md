@@ -1,18 +1,25 @@
 # Session Status — Jobsearch
 
-## START HERE (next session, written 2026-09-30 00:45 UTC)
+## START HERE (next session, written 2026-09-30 ~01:30 UTC)
 
-Read "RESULT 2026-09-29 gold pass d1dd12027da3" below first. Where things stand: the off-by-one is fixed (shift signature 26 -> 1 of ~117). Jev at d1dd12027da3 re-derived with today's code: **catch 0.87 (20/23) PASS / agree 0.71 (22/31), bar 0.85 = 27/31, 5 postings short.** Current Jev prompt_version is **bf97b962d770** (splitter 2026-09-29.4: "Qualifications We Prefer" opens Preferred), so the next full pass re-asks everything (~4.47M tokens, ~$0.19; today's UTC cap is mostly spent).
+Read "RESULT 2026-09-29 gold pass d1dd12027da3" and "RULINGS 2026-09-29 late" below. Where things stand: the off-by-one is fixed (shift signature 26 -> 1). Jev at d1dd12027da3 re-derived with today's code: **catch 0.87 (20/23) PASS / agree 0.74 (23/31), bar 0.85 = 27/31, 4 postings short.** Current Jev prompt_version is **b2f4565faec2** (splitter 2026-09-29.4, QUESTION_SET 2026-09-29.2, one fact added), ~4.50M tokens (~$0.19) for a full pass; the UTC day cap (5M) needs `JEV_DAILY_TOKEN_CAP=10000000` on the command if run before 20:00 ET 9/30.
 
 Open, in order:
-1. **The user rules on the 8 remaining agree misses (judgment, not bugs; list in the RESULT below).** Several are one rule each: shape calls on AI-consulting roles with zero `met` responsibilities, the evidence-without-a-span rule, and environment qualifiers read `unclear`.
-2. **Then (user's go, ~$0.19): full gold pass at the then-current version**, `jev run --eval-set --i-have-approval`, then `jev eval`. Expected +1 from the splitter fix alone (Classified Infrastructure).
+1. **The user re-rules 5 gold rows** on vault `Professional/Areas/Job_Search/Tools/Jev_Reruling_Sheet_20260929.md` (AHEAD AI Principal, Senior Consultant AI Strategist, Amgen GenAI Platform Engineer, Salesforce Help Agent Manager, McKesson BI & Automation). He does not remember the 9/23 `meets` rulings. A row he clears leaves the agree set; a row he flips to `fails` becomes a catch row. Apply with the gold_rulings pattern (vault CSV + DB, before-values to logs/).
+2. **Then (user's go, ~$0.19): full gold pass at b2f4565faec2**, `jev run --eval-set --i-have-approval`, then `jev eval`. Expected from the changes it carries: Classified Infrastructure (+1, splitter), Senior BI Engineer (+1, new fact), Amgen Process Intelligence (+1 if the viz-tools line reads as a category).
 3. Lens: fair out-of-fold TF-IDF comparison (code, free); lens bar not a blocker until agree passes.
 4. Repeatability (r2/r3) only if accuracy passes.
-5. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` fails on a machine whose `.env` holds TYPESAFE_API_KEY, and it makes a REAL call (~8.8K tokens, temp DB). The test must blank the key in the subprocess env / skip .env loading. Deselect it until fixed.
+5. Test hygiene: `tests/test_jev_cli.py::test_cli_live_run_refuses_without_approval_or_key` fails on a machine whose `.env` holds TYPESAFE_API_KEY, and it makes a REAL call (~8.8K tokens, temp DB). Deselect it until fixed.
 
 Job-search side (vault): 9/28 batch -- applied Elevance, Microsoft, Amgen; skipped GDIT, Grafana; Stripe S&O BP marked apply (package final, unsent); Centene and Stripe Total Rewards marked skip in the feedback sheet but NOT yet recorded as skips in Application_Tracker.
 
+
+## RULINGS 2026-09-29 late (the user, on the 8 judgment misses)
+
+- **Tools:** a required tool line with no examples language is probably a gate, but recruiters are looser than JDs (QTS listed Celonis; three interviews never asked). A category with examples in parentheses ("data visualization tools (Power BI, Tableau)") is met by any tool of the kind. -> reading rule extended (jev_questions, QUESTION_SET 2026-09-29.2).
+- **"5+ years leading large-scale analytics efforts": MET.** 20+ years of analytics inside the job; 5+ years of significant big-data analytics (ITAM inventory, force-to-load 2023-2025) across several problems, not one org. -> fact added to `judge2_background.local.md` (the evidence-without-a-span rule stays; the model now has a tenure fact to cite).
+- **Environment qualifier ("significant portion at high-growth tech or consulting"): ADJACENT**, "enough to let it pass and see what happens" (IT and Network at Verizon are tech settings). -> derive guard `_effective_verdict`: a years line left `unclear` on an environment qualifier scores `adjacent` (bridgeable); reading rule says "adjacent, never unclear". Stripe S&O BP: partial -> meets (bridged). **agree 22/31 -> 23/31**, catch unchanged.
+- **Shape calls (4) + McKesson:** the user does not remember the rulings -> re-ruling sheet (item 1 above).
 
 ## RESULT 2026-09-29 gold pass d1dd12027da3 (quoted-line questions): shift gone, agree exposed
 
