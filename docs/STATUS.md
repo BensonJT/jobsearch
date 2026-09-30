@@ -2,10 +2,10 @@
 
 ## START HERE (next session, written 2026-09-30 ~02:30 UTC)
 
-**Both required bars pass on the stored gold answers (d1dd12027da3 re-derived): catch 21/24 = 0.875 (bar 0.70), agree 25/29 = 0.862 (bar 0.85).** In-sample: several of tonight's derive fixes were found by reading gold misses. Confirmation needs (a) the fresh pass at the current prompt_version (the reading-rule changes and the new background facts have NOT been asked yet; only derive-side fixes are measured), and (b) the 8-row 9/28 holdout (`db/holdout_20260929.txt`, never used for tuning; 6/8 at ae02b4049757).
+**Both required bars pass on the stored gold answers (d1dd12027da3 re-derived): catch 21/24 = 0.875 (bar 0.70), agree 25/28 = 0.893 (bar 0.85).** Gold = 89 fails / 28 meets after the 9/29 re-rulings. In-sample: several of tonight's derive fixes were found by reading gold misses. Confirmation needs (a) the fresh pass at the current prompt_version (the reading-rule changes and the new background facts have NOT been asked yet; only derive-side fixes are measured), and (b) the 8-row 9/28 holdout (`db/holdout_20260929.txt`, never used for tuning; 6/8 at ae02b4049757).
 
 Open, in order:
-1. **Salesforce Senior Help Agent Manager** (sheet row 4): the user leans "I didn't perform a job of that shape before ... which is true" but has not ruled. Options: fails on shape, or clear. Also a splitter question: 5 of its "responsibility" lines are intro prose about the role; the 6 real duties alone still read 0 met / 3 adjacent / 3 unmet.
+1. **DONE 9/29: Salesforce Senior Help Agent Manager re-ruled meets -> fails on role shape, aligned with Jev** (logs/gold_rulings_20260929_salesforce_before.json). The re-ruling sheet is complete. Splitter item remains: 5 of its "responsibility" lines are intro prose about the role (the 6 real duties alone still read 0 met / 3 adjacent / 3 unmet).
 2. **Full gold pass at the current prompt_version (user's go, ~$0.19)**: `jev run --eval-set --i-have-approval` (needs `JEV_DAILY_TOKEN_CAP=10000000` before 20:00 ET 9/30), then `jev eval`. Then the holdout: `jev run --eval-set --postings-file db/holdout_20260929.txt`.
 3. If accuracy holds: repeatability r2/r3, injection set, then the user rules on stage 2 (whether Jev may move the rank).
 4. Lens: fair out-of-fold TF-IDF comparison (code, free).
