@@ -1,5 +1,13 @@
 # Session Status — Jobsearch
 
+## 2026-10-02: read-only MCP server for Cowork posting lookups (`1237526`)
+
+- `scripts/mcp_lookup_server.py`: stdlib JSON-RPC over stdio. Tools `lookup_posting` and `search_postings`, each running one `lookup.py` subprocess (the read-only connection is held only for the call; a locked DB returns lookup.py's retry message). Tests: `tests/test_mcp_lookup_server.py` (12).
+- Claude Desktop config has a `jobsearch` entry: `wsl.exe -d Ubuntu-20.04 --cd ~/jobsearch --exec .venv/bin/python scripts/mcp_lookup_server.py`. Backup: `claude_desktop_config.json.bak_20261002_jobsearch`. Vault `browser_search.md` documents it for Cowork.
+- **Open, not from this work:** 9 `tests/test_bridge.py` tests fail since 2026-10-01. They seed `last_seen_at = 2026-09-21`, and `vw_bridge_open` filters `date_diff('day', last_seen_at, now()) < 10` on the wall clock. Fix the test dates (seed relative to now) when the user OKs it. Full suite otherwise: 810 pass.
+- `.personal_patterns` repo-wide grep is not empty on committed code (generic "public trust" clearance terms in backend/tests/docs) or on untracked `logs/`. New files were checked clean on their own.
+
+
 ## START HERE (written 2026-09-30 ~19:30 UTC): STAGE 2 BUILT -- Jev is the end-of-pipeline demotion pass; DEFECT 9/28 (NOT Remote) FIXED and re-normalized; overnight FULL + RETRAIN still to launch
 
 **User's go (2026-09-30 afternoon):** build Jev as the END-of-pipeline demotion pass, report Gemma beside each demotion, and fix the `Office Worker (NOT Remote)` -> `remote` defect. All three done, tested (full suite 594 pass; the two `test_db_maintenance` compact tests and the live-call `test_jev_cli` test stay deselected, pre-existing), pushed.
