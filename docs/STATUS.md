@@ -1,5 +1,12 @@
 # Session Status — Jobsearch
 
+## 2026-10-15: demotion pass was silently off 10/5-10/15; tracker matcher fix
+
+- **Cause:** fact-sheet edits made new prompt_versions (a0a689d48640 10/5, 7fd255930237 10/13) with no required eval, so `jevtop` demoted 0 rows while the page header still said "active". Fix: `jev_gate.ensure_required_bar` (`top --jev` re-measures when the current pv lacks a required eval) and a header WARNING naming shown rows under unmeasured pvs. 7fd255930237 PASSED (catch 0.91, agree 0.93). Re-run page: `Top_Jobs_20261015_2.md`, 43 demoted, Gemma read all 43 (38 fresh, 5 every-model-failed; 6219 s).
+- **Tracker matcher:** a req number named in the Role cell now decides the match (the date-blind fallback had let NFCU 32609 take the 31756 row). `scripts/tracker_rematch_cleanup.py --apply` ran (must run from the vault dir; it reads the tracker by relative path): 16 tracker-sourced decisions dropped on wrongly matched sibling reqs, re-sync added 14. 32609 is `build` again, now from its own tracker row.
+- Gotcha: a `while pgrep -f "<pattern>"` wait loop matches its own bash command line and never exits. Wait on a PID instead.
+- Jev 1.14.0 is in preview; stay pinned to `jev-1.13.0` and run one gold-score test when it is GA.
+
 ## 2026-10-02: read-only MCP server for Cowork posting lookups (`1237526`)
 
 - `scripts/mcp_lookup_server.py`: stdlib JSON-RPC over stdio. Tools `lookup_posting` and `search_postings`, each running one `lookup.py` subprocess (the read-only connection is held only for the call; a locked DB returns lookup.py's retry message). Tests: `tests/test_mcp_lookup_server.py` (12).
